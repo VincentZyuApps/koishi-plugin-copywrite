@@ -60,4 +60,10 @@ __category__: 分类名
 
 ## 许可
 
-MIT。内置文案模板来自上游仓库，遵循其 Apache-2.0 许可。
+[Apache-2.0](./LICENSE)。
+
+本项目移植自 [nonebot-plugin-copywrite](https://github.com/Yan-Zero/nonebot-plugin-copywrite)
+（作者 Yan-Zero，Apache-2.0），包含其文案模板 YAML、prompt 构造逻辑与「汉语新解」prompt
+（prompt 原作者：李继刚）。
+
+主要改动：Python → TypeScript，并针对 Koishi 重新实现指令与 LLM 接入层。详见 [NOTICE](./NOTICE)。

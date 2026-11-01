@@ -7,9 +7,10 @@
   "files": [
     "lib",
     "dist",
-    "resources"
+    "resources",
+    "NOTICE"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://github.com/VincentZyu233/koishi-plugin-copywrite",
   "repository": {
     "type": "git",

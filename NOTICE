@@ -1,0 +1,12 @@
+koishi-plugin-copywrite
+Copyright 2026 VincentZyu233
+
+This product includes software developed by Yan-Zero
+(https://github.com/Yan-Zero/nonebot-plugin-copywrite),
+licensed under the Apache License, Version 2.0.
+
+Modifications from the original work:
+- Ported from Python (nonebot-plugin-copywrite) to TypeScript for Koishi.
+- The preset YAML files under resources/presets/ are copied verbatim.
+- Prompt construction and the "汉语新解" prompt are ported verbatim;
+  the latter was originally written by 李继刚.
