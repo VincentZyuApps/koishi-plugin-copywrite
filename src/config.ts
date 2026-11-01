@@ -1,19 +1,42 @@
 import { Schema } from 'koishi'
 
+// ====================
+// 🧩 常量定义
+// ====================
+
+/** 🧭 模型通道与回退顺序 */
 export const LLM_MODES = {
-  'chatluna-only': '仅 ChatLuna',
-  'custom-only': '仅自定义 API',
-  'chatluna-first': '先 ChatLuna，不可用时回退自定义 API',
-  'custom-first': '先自定义 API，不可用时回退 ChatLuna',
+  'chatluna-only': '☁️ 仅 ChatLuna',
+  'custom-only': '🔐 仅自定义 API',
+  'chatluna-first': '☁️➡️🔐 先 ChatLuna，不可用时回退自定义 API',
+  'custom-first': '🔐➡️☁️ 先自定义 API，不可用时回退 ChatLuna',
 } as const
 
 export type LlmMode = keyof typeof LLM_MODES
-export type ApiFormat = 'openai' | 'anthropic'
 
+/** 🧩 自定义 API 的接口格式 */
+export const API_FORMATS = {
+  openai: '🧩 OpenAI 兼容（/v1/chat/completions）',
+  anthropic: '🧩 Anthropic（/v1/messages）',
+} as const
+
+export type ApiFormat = keyof typeof API_FORMATS
+
+/** 📌 默认指令名与别名 */
+export const DEFAULT_COMMAND_NAME = 'copywrite'
+export const DEFAULT_COMMAND_ALIASES = ['文案', '模仿文案']
+export const DEFAULT_NEW_MEANING_COMMAND_NAME = 'new-meaning'
+export const DEFAULT_NEW_MEANING_ALIASES = ['汉语新解']
+
+// ====================
+// 📋 配置接口定义
+// ====================
+
+/** 🔐 一条自定义 API 通道 */
 export interface CustomProvider {
   baseURL: string
   apiKey: string
-  /** 实际请求的模型名，留空则使用条目里 config.customProviders 的 key */
+  /** 🤖 实际请求的模型名，留空则使用该条目在表格中的 key */
   model?: string
   apiFormat: ApiFormat
   temperature: number
@@ -21,6 +44,7 @@ export interface CustomProvider {
   timeout: number
 }
 
+/** 🛡️ 各管理命令的权限等级 */
 export interface AuthorityConfig {
   reload: number
   reset: number
@@ -29,102 +53,249 @@ export interface AuthorityConfig {
 }
 
 export interface Config {
-  llmMode: LlmMode
+  // 📌 指令配置
+  commandName: string
+  commandAliases: string[]
+  newMeaningCommandName: string
+  newMeaningAliases: string[]
 
+  // 🤖 模型接入
+  llmMode: LlmMode
+  fallbackOnError: boolean
+
+  // ☁️ ChatLuna 接入
   chatlunaModel: string
   chatlunaModelMap: Record<string, string>
 
+  // 🔐 自定义 API 通道
   customProviders: Record<string, CustomProvider>
   defaultCustomProvider: string
-  fallbackOnError: boolean
 
+  // 📂 模板数据
   presetDir: string
   autoRelease: boolean
   watchPresets: boolean
 
+  // 🎨 汉语新解
   enableNewMeaning: boolean
   newMeaningModel: string
   svgFontFamily: string
   svgScale: number
 
+  // ⏳ 频率限制
   cooldown: number
+
+  // 🛡️ 命令权限
   authority: AuthorityConfig
+
+  // 🐛 调试
+  verboseLog: boolean
 }
 
-export const Config = Schema.object({
-  llmMode: Schema.union(
-    (Object.keys(LLM_MODES) as LlmMode[]).map((key) =>
-      Schema.const(key).description(LLM_MODES[key]),
+// ====================
+// ⚙️ 配置 Schema 定义
+// ====================
+
+export const Config = Schema.intersect([
+  // ==================
+  // 📌 指令配置分组
+  // ==================
+  Schema.object({
+    commandName: Schema.string()
+      .default(DEFAULT_COMMAND_NAME)
+      .description('📌 生成文案的主指令名，默认是 <code>copywrite</code>。'),
+    commandAliases: Schema.array(Schema.string())
+      .role('table')
+      .default([...DEFAULT_COMMAND_ALIASES])
+      .description(
+        '🏷️ 主指令的别名表格，默认提供「文案」和「模仿文案」。空项、重复项以及与主指令同名的项会自动忽略。',
+      ),
+    newMeaningCommandName: Schema.string()
+      .default(DEFAULT_NEW_MEANING_COMMAND_NAME)
+      .description('🖼️ 汉语新解的主指令名，默认是 <code>new-meaning</code>。'),
+    newMeaningAliases: Schema.array(Schema.string())
+      .role('table')
+      .default([...DEFAULT_NEW_MEANING_ALIASES])
+      .description(
+        '🏷️ 汉语新解的别名表格，默认提供「汉语新解」。空项、重复项以及与主指令同名的项会自动忽略。',
+      ),
+  }).description('📌 指令配置'),
+
+  // ==================
+  // 🤖 模型接入分组
+  // ==================
+  Schema.object({
+    llmMode: Schema.union(
+      (Object.keys(LLM_MODES) as LlmMode[]).map((key) =>
+        Schema.const(key).description(LLM_MODES[key]),
+      ),
+    )
+      .role('radio')
+      .default('chatluna-first')
+      .description(
+        '🧭 模型通道的优先级与回退顺序。默认先 ChatLuna，未安装或模型不可用时自动回退到自定义 API。',
+      ),
+    fallbackOnError: Schema.boolean()
+      .default(false)
+      .description(
+        '🛟 请求报错时是否也切换到下一条通道。默认关闭，避免一次请求被重复计费。',
+      ),
+  }).description('🤖 模型接入'),
+
+  // ==================
+  // ☁️ ChatLuna 接入分组
+  // ==================
+  Schema.object({
+    chatlunaModel: Schema.dynamic('model').description(
+      '☁️ ChatLuna 模式下使用的默认模型。留空则使用 ChatLuna 配置里的默认模型。',
     ),
-  )
-    .default('chatluna-first')
-    .description('接入方式与回退顺序。'),
+    chatlunaModelMap: Schema.dict(Schema.string())
+      .role('table')
+      .description(
+        '🔀 把模板 YAML 里的 <code>model</code> 名映射到 ChatLuna 的 <code>platform/model</code>，例如 <code>gemini-2.5-flash-nothinking: gemini/gemini-2.5-flash</code>。',
+      ),
+  }).description('☁️ ChatLuna 接入'),
 
-  chatlunaModel: Schema.dynamic('model')
-    .description('ChatLuna 模式下的默认模型，留空则使用 ChatLuna 配置里的默认模型。'),
-  chatlunaModelMap: Schema.dict(Schema.string())
-    .role('table')
-    .description(
-      'YAML 里 model 名到 ChatLuna 模型的映射，例如 `gemini-2.5-flash-nothinking: gemini/gemini-2.5-flash`。',
+  // ==================
+  // 🔐 自定义 API 通道分组
+  // ==================
+  Schema.object({
+    customProviders: Schema.dict(
+      Schema.object({
+        baseURL: Schema.string()
+          .required()
+          .description('🌐 接口地址，可带或不带 <code>/v1</code>。'),
+        apiKey: Schema.string()
+          .role('secret')
+          .required()
+          .description('🔑 API Key，仅保存在本地配置中。'),
+        model: Schema.string().description(
+          '🤖 实际请求的模型名；留空则使用该条目在表格中的 key。',
+        ),
+        apiFormat: Schema.union(
+          (Object.keys(API_FORMATS) as ApiFormat[]).map((key) =>
+            Schema.const(key).description(API_FORMATS[key]),
+          ),
+        )
+          .role('radio')
+          .default('openai')
+          .description('🧩 接口格式，决定请求路径与鉴权方式。'),
+        temperature: Schema.number()
+          .role('slider')
+          .min(0)
+          .max(2)
+          .step(0.05)
+          .default(0.65)
+          .description('🌡️ 采样温度（0–2），越高越发散。'),
+        maxTokens: Schema.number()
+          .min(1)
+          .default(2048)
+          .description('📏 单次回复的最大 token 数。'),
+        timeout: Schema.number()
+          .min(1000)
+          .default(120000)
+          .description('⏱️ 请求超时时间（毫秒）。'),
+      }),
+    )
+      .role('table')
+      .description(
+        '🔐 按模板里 <code>model</code> 字段索引的 API 通道表，结构与上游 <code>configs/chatgpt-vision/keys.yaml</code> 一致。',
+      ),
+    defaultCustomProvider: Schema.string().description(
+      '🪄 找不到匹配 key 时使用的通道名；留空则取表格第一项。',
     ),
+  }).description('🔐 自定义 API 通道'),
 
-  customProviders: Schema.dict(
-    Schema.object({
-      baseURL: Schema.string()
-        .required()
-        .description('接口地址，可带或不带 `/v1`。'),
-      apiKey: Schema.string().role('secret').required().description('API Key。'),
-      model: Schema.string().description('实际请求的模型名，留空则使用该条目的 key。'),
-      apiFormat: Schema.union([
-        Schema.const('openai').description('OpenAI 兼容（/chat/completions）'),
-        Schema.const('anthropic').description('Anthropic（/v1/messages）'),
-      ])
-        .default('openai')
-        .description('接口格式。'),
-      temperature: Schema.number().min(0).max(2).step(0.05).default(0.65),
-      maxTokens: Schema.number().min(1).default(2048),
-      timeout: Schema.number().min(1000).default(120000).description('超时时间（毫秒）。'),
-    }),
-  )
-    .role('table')
-    .description(
-      '自定义 API 通道，key 对应 YAML 里的 model 字段。结构对齐上游的 configs/chatgpt-vision/keys.yaml。',
+  // ==================
+  // 📂 模板数据分组
+  // ==================
+  Schema.object({
+    presetDir: Schema.string()
+      .default('data/copywrite/presets')
+      .description('📁 用户模板目录，相对于 Koishi 的 <code>baseDir</code>。'),
+    autoRelease: Schema.boolean()
+      .default(true)
+      .description(
+        '📦 启动时把内置模板补齐到用户目录；只补缺失，不覆盖已有文件。',
+      ),
+    watchPresets: Schema.boolean()
+      .default(true)
+      .description('👀 监听模板目录，改完 YAML 保存即生效，无需重启。'),
+  }).description('📂 模板数据'),
+
+  // ==================
+  // 🎨 汉语新解分组
+  // ==================
+  Schema.object({
+    enableNewMeaning: Schema.boolean()
+      .default(true)
+      .description(
+        '🖼️ 是否启用「汉语新解」指令（默认 <code>/汉语新解 调休</code>）。',
+      ),
+    newMeaningModel: Schema.string().description(
+      '🤖 汉语新解使用的模型：ChatLuna 模式填模型名，自定义模式填通道 key；留空则跟随默认。',
     ),
-  defaultCustomProvider: Schema.string().description(
-    '找不到对应 key 时使用的自定义通道名，留空则取 customProviders 的第一个。',
-  ),
-  fallbackOnError: Schema.boolean()
-    .default(false)
-    .description('是否在请求报错（而非配置缺失）时也切换到下一条通道。'),
+    svgFontFamily: Schema.string()
+      .default('Microsoft YaHei')
+      .description('🔤 SVG 渲染时的默认字体族，缺字体时自动回退。'),
+    svgScale: Schema.number()
+      .role('slider')
+      .min(0.5)
+      .max(4)
+      .step(0.5)
+      .default(2)
+      .description('🔍 SVG 转 PNG 的缩放倍数，越大越清晰、图片也越大。'),
+  }).description('🎨 汉语新解'),
 
-  presetDir: Schema.string()
-    .default('data/copywrite/presets')
-    .description('用户模板目录，相对于 Koishi 的 baseDir。'),
-  autoRelease: Schema.boolean()
-    .default(true)
-    .description('启动时把内置模板补齐到用户目录（不覆盖已存在的文件）。'),
-  watchPresets: Schema.boolean()
-    .default(true)
-    .description('监听模板目录，改动后自动重载。'),
+  // ==================
+  // ⏳ 频率限制分组
+  // ==================
+  Schema.object({
+    cooldown: Schema.number()
+      .role('slider')
+      .min(0)
+      .max(300)
+      .step(5)
+      .default(0)
+      .description('⏳ 同一用户两次生成之间的冷却时间（秒），0 表示不限制。'),
+  }).description('⏳ 频率限制'),
 
-  enableNewMeaning: Schema.boolean().default(true).description('是否启用「汉语新解」。'),
-  newMeaningModel: Schema.string().description(
-    '汉语新解使用的模型：ChatLuna 模式填模型名，自定义模式填 customProviders 的 key；留空使用默认。',
-  ),
-  svgFontFamily: Schema.string()
-    .default('Microsoft YaHei')
-    .description('SVG 渲染时的默认字体。'),
-  svgScale: Schema.number().min(0.5).max(4).default(2).description('SVG 转 PNG 的缩放倍数。'),
+  // ==================
+  // 🛡️ 命令权限分组
+  // ==================
+  Schema.object({
+    authority: Schema.object({
+      reload: Schema.natural()
+        .role('slider')
+        .max(5)
+        .default(4)
+        .description('🔄 重载模板目录。'),
+      reset: Schema.natural()
+        .role('slider')
+        .max(5)
+        .default(4)
+        .description('♻️ 重新释放内置模板（覆盖同名文件）。'),
+      clone: Schema.natural()
+        .role('slider')
+        .max(5)
+        .default(3)
+        .description('📄 复制一份模板到用户目录。'),
+      rm: Schema.natural()
+        .role('slider')
+        .max(5)
+        .default(3)
+        .description('🗑️ 删除用户目录里的模板。'),
+    }).description('🛡️ 各管理命令所需的 Koishi authority 等级（0–5）。'),
+  }).description('🛡️ 命令权限'),
 
-  cooldown: Schema.number()
-    .min(0)
-    .default(0)
-    .description('同一用户两次生成之间的冷却时间（秒），0 表示不限制。'),
-
-  authority: Schema.object({
-    reload: Schema.natural().max(5).default(4).description('重载模板'),
-    reset: Schema.natural().max(5).default(4).description('重新释放内置模板'),
-    clone: Schema.natural().max(5).default(3).description('复制模板'),
-    rm: Schema.natural().max(5).default(3).description('删除模板'),
-  }).description('命令权限等级（Koishi authority，0–5）。'),
-}) as unknown as Schema<Config>
+  // ==================
+  // 🐛 调试分组
+  // ==================
+  Schema.object({
+    verboseLog: Schema.boolean()
+      .default(false)
+      .description(
+        '🐛 在日志里输出完整 prompt、命中的模型通道与耗时。<br><i>内容较长，仅在排查问题时开启。</i>',
+      ),
+  }).description('🐛 调试'),
+]) as unknown as Schema<Config>

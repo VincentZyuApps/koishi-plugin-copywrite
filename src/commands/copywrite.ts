@@ -2,7 +2,10 @@ import path from 'node:path'
 
 import type { Context, Session } from 'koishi'
 
-import type { Config } from '../config'
+import {
+  DEFAULT_COMMAND_NAME,
+  type Config,
+} from '../config'
 import {
   removePatternFile,
   writePatternFile,
@@ -11,6 +14,11 @@ import {
 import { LlmRouter } from '../llm'
 import { generateCopywrite } from '../prompt'
 import { resetPresets } from '../resources'
+import {
+  normalizeAliases,
+  normalizeCommandName,
+  splitKeywords,
+} from './utils'
 
 const RESERVED = new Set(['reload', 'reset', 'clone', 'rm', 'remove', 'delete'])
 
@@ -21,53 +29,64 @@ export function registerCopywrite(
   router: LlmRouter,
 ): void {
   const cooldowns = new Map<string, number>()
+  const commandName = normalizeCommandName(config.commandName, DEFAULT_COMMAND_NAME)
+  const aliases = normalizeAliases(config.commandAliases, commandName)
+  const logger = ctx.logger('copywrite')
 
-  ctx
-    .command('copywrite [input:text]', '生成定型文')
-    .alias('文案', '模仿文案')
-    .action(async ({ session }, input) => {
-      const raw = (input ?? '').trim()
-      if (!raw) return formatList(store)
+  const command = ctx.command(`${commandName} [input:text]`, '生成定型文')
+  if (aliases.length) command.alias(...aliases)
 
-      const head = raw.split(/\s+/, 1)[0]
-      const name = head.toLowerCase()
-      const rest = raw.slice(head.length).trim()
+  command.action(async ({ session }, input) => {
+    const raw = (input ?? '').trim()
+    if (!raw) return formatList(store)
 
-      if (RESERVED.has(name)) {
-        return handleReserved(ctx, config, store, session, name, rest)
-      }
+    const head = raw.split(/\s+/, 1)[0]
+    const name = head.toLowerCase()
+    const rest = raw.slice(head.length).trim()
 
-      const entry = store.get(name)
-      if (!entry) return '没有找到该文案'
+    if (RESERVED.has(name)) {
+      return handleReserved(ctx, config, store, session, name, rest)
+    }
 
-      if (!rest) return entry.help || '主题呢？'
+    const entry = store.get(name)
+    if (!entry) return '没有找到该文案'
 
-      const parts = splitKeywords(rest, entry.keywords)
-      if (parts.length < entry.keywords) {
-        const hint = `需要有${entry.keywords - parts.length}个关键词。`
-        return entry.help ? `${hint}\n\n${entry.help}` : hint
-      }
+    if (!rest) return entry.help || '主题呢？'
 
-      const topic = parts[parts.length - 1]
-      const keywords = parts.slice(0, -1)
+    const parts = splitKeywords(rest, entry.keywords)
+    if (parts.length < entry.keywords) {
+      const hint = `需要有${entry.keywords - parts.length}个关键词。`
+      return entry.help ? `${hint}\n\n${entry.help}` : hint
+    }
 
-      const cooldown = checkCooldown(session, config.cooldown, cooldowns)
-      if (!cooldown.ok) {
-        return `冷却中，请 ${cooldown.remaining} 秒后再试。`
-      }
+    const topic = parts[parts.length - 1]
+    const keywords = parts.slice(0, -1)
 
-      try {
-        const result = await router.chat(entry, [
-          {
-            role: 'user',
-            content: generateCopywrite(entry, topic, keywords),
-          },
-        ])
-        return result.text
-      } catch (error) {
-        return `发生错误: ${errorMessage(error)}`
-      }
-    })
+    const cooldown = checkCooldown(session, config.cooldown, cooldowns)
+    if (!cooldown.ok) {
+      return `冷却中，请 ${cooldown.remaining} 秒后再试。`
+    }
+
+    const prompt = generateCopywrite(entry, topic, keywords)
+    if (config.verboseLog) {
+      logger.info(
+        'verbose prompt: 「%s」 topic=%s keywords=[%s]\n%s',
+        entry.rawName,
+        topic,
+        keywords.join(', '),
+        prompt,
+      )
+    }
+
+    try {
+      const result = await router.chat(entry, [
+        { role: 'user', content: prompt },
+      ])
+      return result.text
+    } catch (error) {
+      return `发生错误: ${errorMessage(error)}`
+    }
+  })
 }
 
 async function handleReserved(
@@ -216,25 +235,6 @@ function formatList(store: PatternStore): string {
   return groups
     .map((group) => `${group.category}:\n  ${group.keys.join(', ')}`)
     .join('\n')
-}
-
-/**
- * 复刻 Python 的 `str.split(maxsplit=keywords - 1)`：
- * 最后一个片段整体作为主题，前面的是关键词。
- */
-export function splitKeywords(text: string, count: number): string[] {
-  const parts: string[] = []
-  let rest = text.trim()
-
-  for (let index = 1; index < count; index++) {
-    const match = rest.match(/\s+/)
-    if (!match || match.index === undefined) break
-    parts.push(rest.slice(0, match.index))
-    rest = rest.slice(match.index + match[0].length)
-  }
-
-  if (rest) parts.push(rest)
-  return parts
 }
 
 function checkCooldown(

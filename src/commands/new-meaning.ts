@@ -1,9 +1,13 @@
 import { h, type Context } from 'koishi'
 
-import type { Config } from '../config'
+import {
+  DEFAULT_NEW_MEANING_COMMAND_NAME,
+  type Config,
+} from '../config'
 import { LlmRouter } from '../llm'
 import { buildNewMeaningMessages } from '../prompts/new-meaning'
 import { extractSvg, svgToPng } from '../render'
+import { normalizeAliases, normalizeCommandName } from './utils'
 
 export function registerNewMeaning(
   ctx: Context,
@@ -12,32 +16,52 @@ export function registerNewMeaning(
 ): void {
   if (!config.enableNewMeaning) return
 
-  ctx
-    .command('new-meaning <word:text>', '用一个全新的角度解释汉语词汇')
-    .alias('汉语新解')
-    .action(async (_, word) => {
-      const input = (word ?? '').trim()
-      if (!input) return '想解释哪个词？'
+  const commandName = normalizeCommandName(
+    config.newMeaningCommandName,
+    DEFAULT_NEW_MEANING_COMMAND_NAME,
+  )
+  const aliases = normalizeAliases(config.newMeaningAliases, commandName)
+  const logger = ctx.logger('copywrite')
 
-      try {
-        const result = await router.chat(
-          { model: config.newMeaningModel || undefined },
-          buildNewMeaningMessages(input),
-        )
+  const command = ctx.command(
+    `${commandName} <word:text>`,
+    '用一个全新的角度解释汉语词汇',
+  )
+  if (aliases.length) command.alias(...aliases)
 
-        const svg = extractSvg(result.text)
-        if (!svg) {
-          return '模型没有返回 SVG，请重试或换一个模型。'
-        }
+  command.action(async (_, word) => {
+    const input = (word ?? '').trim()
+    if (!input) return '想解释哪个词？'
 
-        const png = svgToPng(svg, {
-          fontFamily: config.svgFontFamily,
-          scale: config.svgScale,
-        })
+    const messages = buildNewMeaningMessages(input)
+    if (config.verboseLog) {
+      logger.info(
+        'verbose prompt: 「汉语新解」 word=%s messages=%d\n%s',
+        input,
+        messages.length,
+        messages.map((message) => `[${message.role}]\n${message.content}`).join('\n\n'),
+      )
+    }
 
-        return h.image(png, 'image/png')
-      } catch (error) {
-        return `发生错误: ${error instanceof Error ? error.message : String(error)}`
+    try {
+      const result = await router.chat(
+        { model: config.newMeaningModel || undefined },
+        messages,
+      )
+
+      const svg = extractSvg(result.text)
+      if (!svg) {
+        return '模型没有返回 SVG，请重试或换一个模型。'
       }
-    })
+
+      const png = svgToPng(svg, {
+        fontFamily: config.svgFontFamily,
+        scale: config.svgScale,
+      })
+
+      return h.image(png, 'image/png')
+    } catch (error) {
+      return `发生错误: ${error instanceof Error ? error.message : String(error)}`
+    }
+  })
 }

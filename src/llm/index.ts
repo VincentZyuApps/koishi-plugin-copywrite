@@ -1,4 +1,4 @@
-import type { Context } from 'koishi'
+import type { Context, Logger } from 'koishi'
 
 import type { Config, CustomProvider, LlmMode } from '../config'
 import type { ChatMessage, LlmClient } from '../types'
@@ -37,10 +37,14 @@ export interface PatternModelRef {
 }
 
 export class LlmRouter {
+  private readonly logger: Logger
+
   constructor(
     private readonly ctx: Context,
     private readonly config: Config,
-  ) {}
+  ) {
+    this.logger = ctx.logger('copywrite')
+  }
 
   order(): LlmVia[] {
     return resolveOrder(this.config.llmMode)
@@ -87,20 +91,43 @@ export class LlmRouter {
     const errors: string[] = []
 
     for (const via of this.order()) {
+      const startedAt = Date.now()
       try {
         const client = await this.create(via, model)
         const text = await client.chat({ messages })
-        return {
-          text,
-          via,
-          channel:
-            via === 'chatluna'
-              ? this.chatlunaModelName(model)
-              : (this.customProvider(model)?.key ?? ''),
+        const channel =
+          via === 'chatluna'
+            ? this.chatlunaModelName(model)
+            : (this.customProvider(model)?.key ?? '')
+
+        if (this.config.verboseLog) {
+          this.logger.info(
+            'verbose route: %s → %s (%dms)',
+            via,
+            channel || '(未指定)',
+            Date.now() - startedAt,
+          )
         }
+
+        return { text, via, channel }
       } catch (error) {
         if (!(error instanceof LlmUnavailableError) && !this.config.fallbackOnError) {
+          if (this.config.verboseLog) {
+            this.logger.warn(
+              'verbose route: %s 请求失败（%s）',
+              via,
+              errorMessage(error),
+            )
+          }
           throw error
+        }
+
+        if (this.config.verboseLog) {
+          this.logger.warn(
+            'verbose route fallback: %s 不可用（%s），尝试下一条通道',
+            via,
+            errorMessage(error),
+          )
         }
         errors.push(`${via}: ${errorMessage(error)}`)
       }

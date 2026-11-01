@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Config, CustomProvider } from '../src/config'
-import { splitKeywords } from '../src/commands/copywrite'
+import { splitKeywords } from '../src/commands/utils'
 import { LlmRouter, resolveOrder } from '../src/llm'
 import { appendEndpoint } from '../src/llm/openai'
 import type { Context } from 'koishi'
@@ -74,7 +74,11 @@ function createRouter(overrides: Partial<Config>) {
     ...overrides,
   } as Config
 
-  return new LlmRouter({} as Context, config)
+  const ctx = {
+    logger: () => ({ debug() {}, info() {}, warn() {}, error() {} }),
+  } as unknown as Context
+
+  return new LlmRouter(ctx, config)
 }
 
 describe('LlmRouter.customProvider', () => {
