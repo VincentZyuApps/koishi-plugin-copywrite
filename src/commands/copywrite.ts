@@ -24,7 +24,7 @@ export function registerCopywrite(
 
   ctx
     .command('copywrite [input:text]', '生成定型文')
-    .alias('文案')
+    .alias('文案', '模仿文案')
     .action(async ({ session }, input) => {
       const raw = (input ?? '').trim()
       if (!raw) return formatList(store)

@@ -5,3 +5,7 @@
 *.ico -text
 *.gif -text
 *.webp -text
+
+# YAML 在 Linguist 里属于 data 类型，默认不计入语言统计，这里显式打开。
+*.yaml linguist-detectable linguist-language=YAML
+*.yml  linguist-detectable linguist-language=YAML
