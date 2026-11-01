@@ -1,0 +1,268 @@
+import path from 'node:path'
+
+import type { Context, Session } from 'koishi'
+
+import type { Config } from '../config'
+import {
+  removePatternFile,
+  writePatternFile,
+  type PatternStore,
+} from '../data'
+import { LlmRouter } from '../llm'
+import { generateCopywrite } from '../prompt'
+import { resetPresets } from '../resources'
+
+const RESERVED = new Set(['reload', 'reset', 'clone', 'rm', 'remove', 'delete'])
+
+export function registerCopywrite(
+  ctx: Context,
+  config: Config,
+  store: PatternStore,
+  router: LlmRouter,
+): void {
+  const cooldowns = new Map<string, number>()
+
+  ctx
+    .command('copywrite [input:text]', '生成定型文')
+    .alias('文案')
+    .action(async ({ session }, input) => {
+      const raw = (input ?? '').trim()
+      if (!raw) return formatList(store)
+
+      const head = raw.split(/\s+/, 1)[0]
+      const name = head.toLowerCase()
+      const rest = raw.slice(head.length).trim()
+
+      if (RESERVED.has(name)) {
+        return handleReserved(ctx, config, store, session, name, rest)
+      }
+
+      const entry = store.get(name)
+      if (!entry) return '没有找到该文案'
+
+      if (!rest) return entry.help || '主题呢？'
+
+      const parts = splitKeywords(rest, entry.keywords)
+      if (parts.length < entry.keywords) {
+        const hint = `需要有${entry.keywords - parts.length}个关键词。`
+        return entry.help ? `${hint}\n\n${entry.help}` : hint
+      }
+
+      const topic = parts[parts.length - 1]
+      const keywords = parts.slice(0, -1)
+
+      const cooldown = checkCooldown(session, config.cooldown, cooldowns)
+      if (!cooldown.ok) {
+        return `冷却中，请 ${cooldown.remaining} 秒后再试。`
+      }
+
+      try {
+        const result = await router.chat(entry, [
+          {
+            role: 'user',
+            content: generateCopywrite(entry, topic, keywords),
+          },
+        ])
+        return result.text
+      } catch (error) {
+        return `发生错误: ${errorMessage(error)}`
+      }
+    })
+}
+
+async function handleReserved(
+  ctx: Context,
+  config: Config,
+  store: PatternStore,
+  session: Session | undefined,
+  name: string,
+  rest: string,
+): Promise<string> {
+  switch (name) {
+    case 'reload': {
+      if (!(await hasAuthority(ctx, session, config.authority.reload))) {
+        return '没有权限哦。'
+      }
+      return (await store.reload())
+        ? '重新加载完成。'
+        : `重新加载完成。（共 ${store.size} 条模板）`
+    }
+
+    case 'reset': {
+      if (!(await hasAuthority(ctx, session, config.authority.reset))) {
+        return '没有权限哦。'
+      }
+      const result = await resetPresets(ctx.baseDir, config)
+      if (!result.writable) {
+        return `重新释放失败：${result.error ?? '目录不可写'}`
+      }
+      await store.reload(result.dir)
+      return `已重新释放 ${result.copied.length} 个内置模板。`
+    }
+
+    case 'clone': {
+      if (!(await hasAuthority(ctx, session, config.authority.clone))) {
+        return '没有权限哦。'
+      }
+      return clone(ctx, store, rest)
+    }
+
+    case 'rm':
+    case 'remove':
+    case 'delete': {
+      if (!(await hasAuthority(ctx, session, config.authority.rm))) {
+        return '没有权限哦。'
+      }
+      return remove(store, session, rest)
+    }
+
+    default:
+      return '没有找到该文案'
+  }
+}
+
+async function clone(
+  ctx: Context,
+  store: PatternStore,
+  rest: string,
+): Promise<string> {
+  const [originName, newName] = rest.split(/\s+/)
+
+  if (!originName || !newName) {
+    return '用法：/文案 clone <原名> <新名>'
+  }
+
+  const origin = store.get(originName)
+  if (!origin) return '没有找到该文案'
+  if (store.get(newName)) return `「${newName}」已存在`
+  if (isReadonly(store)) return '当前为只读模式，无法写入模板。'
+
+  try {
+    await writePatternFile(store.presetDir, newName, origin)
+    await store.reload()
+    return `已复制为「${newName}」，可以在 ${store.presetDir} 下继续编辑。`
+  } catch (error) {
+    ctx.logger('copywrite').warn('复制模板失败：%s', errorMessage(error))
+    return `复制失败：${errorMessage(error)}`
+  }
+}
+
+async function remove(
+  store: PatternStore,
+  session: Session | undefined,
+  rest: string,
+): Promise<string> {
+  const name = rest.split(/\s+/)[0]
+  if (!name) return '用法：/文案 rm <名字>'
+
+  const entry = store.get(name)
+  if (!entry) return '没有找到该文案'
+  if (isReadonly(store)) return '当前为只读模式，无法删除模板。'
+
+  const confirmed = await confirm(session, `回复 Y 确认删除「${entry.rawName}」`)
+  if (confirmed === null) return '已取消。'
+  if (!confirmed) return '已取消。'
+
+  try {
+    const result = await removePatternFile(entry, store.presetDir)
+    await store.reload()
+    return result === 'deleted'
+      ? `已删除「${entry.rawName}」。`
+      : `已从文件中移除「${entry.rawName}」。`
+  } catch (error) {
+    return `删除失败：${errorMessage(error)}`
+  }
+}
+
+async function confirm(
+  session: Session | undefined,
+  hint: string,
+): Promise<boolean | null> {
+  if (!session?.prompt) return true
+
+  await session.send(hint)
+  const answer = await session.prompt(30_000)
+  if (!answer) return null
+
+  return answer.trim().toUpperCase() === 'Y'
+}
+
+async function hasAuthority(
+  ctx: Context,
+  session: Session | undefined,
+  level: number,
+): Promise<boolean> {
+  if (level <= 0) return true
+  if (!session) return false
+
+  try {
+    await (
+      session as unknown as { observeUser?: (fields: string[]) => Promise<void> }
+    ).observeUser?.(['authority'])
+    return await ctx.permissions.test(`authority:${level}`, session)
+  } catch {
+    const user = session.user as unknown as { authority?: number } | undefined
+    return (user?.authority ?? 0) >= level
+  }
+}
+
+function isReadonly(store: PatternStore): boolean {
+  return path.resolve(store.activeDir) !== path.resolve(store.presetDir)
+}
+
+function formatList(store: PatternStore): string {
+  const groups = store.groups()
+  if (!groups.length) return '好像一片空白？'
+  return groups
+    .map((group) => `${group.category}:\n  ${group.keys.join(', ')}`)
+    .join('\n')
+}
+
+/**
+ * 复刻 Python 的 `str.split(maxsplit=keywords - 1)`：
+ * 最后一个片段整体作为主题，前面的是关键词。
+ */
+export function splitKeywords(text: string, count: number): string[] {
+  const parts: string[] = []
+  let rest = text.trim()
+
+  for (let index = 1; index < count; index++) {
+    const match = rest.match(/\s+/)
+    if (!match || match.index === undefined) break
+    parts.push(rest.slice(0, match.index))
+    rest = rest.slice(match.index + match[0].length)
+  }
+
+  if (rest) parts.push(rest)
+  return parts
+}
+
+function checkCooldown(
+  session: Session | undefined,
+  seconds: number,
+  cache: Map<string, number>,
+): { ok: boolean; remaining: number } {
+  if (!seconds || seconds <= 0 || !session) return { ok: true, remaining: 0 }
+
+  const key = `${session.platform ?? ''}:${session.userId ?? ''}`
+  const now = Date.now()
+  const until = cache.get(key) ?? 0
+
+  if (until > now) {
+    return { ok: false, remaining: Math.ceil((until - now) / 1000) }
+  }
+
+  cache.set(key, now + seconds * 1000)
+
+  if (cache.size > 1000) {
+    for (const [item, expires] of cache) {
+      if (expires <= now) cache.delete(item)
+    }
+  }
+
+  return { ok: true, remaining: 0 }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
