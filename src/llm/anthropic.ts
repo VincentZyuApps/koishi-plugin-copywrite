@@ -1,6 +1,6 @@
 import type { Context } from 'koishi'
 
-import type { CustomProvider } from '../config'
+import type { ResolvedProvider } from '../config'
 import { isRecord, type ChatRequest, type LlmClient } from '../types'
 import { LlmRequestError, LlmUnavailableError } from './errors'
 import { appendEndpoint, describeError } from './openai'
@@ -15,7 +15,7 @@ export class AnthropicClient implements LlmClient {
 
   constructor(
     private readonly ctx: Context,
-    private readonly provider: CustomProvider,
+    private readonly provider: ResolvedProvider,
     private readonly fallbackModel?: string,
   ) {
     if (!provider.baseURL) throw new LlmUnavailableError('未填写 baseURL')

@@ -57,9 +57,6 @@ const provider = (overrides: Partial<CustomProvider> = {}): CustomProvider => ({
   baseURL: 'https://api.example.com/v1',
   apiKey: 'sk-test',
   apiFormat: 'openai',
-  temperature: 0.65,
-  maxTokens: 1024,
-  timeout: 10_000,
   ...overrides,
 })
 

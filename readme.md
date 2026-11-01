@@ -40,6 +40,8 @@ rename 之外的管理指令默认需要 Koishi 权限等级 3，`reload` / `res
 
 四种模式：仅 ChatLuna、仅自定义、先 ChatLuna 后自定义、先自定义后 ChatLuna。默认先 ChatLuna，没装则自动回退自定义。
 
+自定义 API 的温度、最大 token 数和超时是全局配置，在「⚙️ 调用参数」里调整。
+
 ## 模板格式
 
 ```yaml

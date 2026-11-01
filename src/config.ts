@@ -39,10 +39,17 @@ export interface CustomProvider {
   /** 🤖 实际请求的模型名，留空则使用该条目在表格中的 key */
   model?: string
   apiFormat: ApiFormat
+}
+
+/** ⚙️ 自定义 API 的全局调用参数 */
+export interface RequestDefaults {
   temperature: number
   maxTokens: number
   timeout: number
 }
+
+/** 🔌 通道 + 全局参数，客户端实际使用的形态 */
+export interface ResolvedProvider extends CustomProvider, RequestDefaults {}
 
 /** 🛡️ 各管理命令的权限等级 */
 export interface AuthorityConfig {
@@ -70,6 +77,11 @@ export interface Config {
   // 🔐 自定义 API 通道
   customProviders: Record<string, CustomProvider>
   defaultCustomProvider: string
+
+  // ⚙️ 调用参数
+  temperature: number
+  maxTokens: number
+  timeout: number
 
   // 📂 模板数据
   presetDir: string
@@ -180,22 +192,8 @@ export const Config = Schema.intersect([
           .role('radio')
           .default('openai')
           .description('🧩 接口格式，决定请求路径与鉴权方式。'),
-        temperature: Schema.number()
-          .role('slider')
-          .min(0)
-          .max(2)
-          .step(0.05)
-          .default(0.65)
-          .description('🌡️ 采样温度（0–2），越高越发散。'),
-        maxTokens: Schema.number()
-          .min(1)
-          .default(2048)
-          .description('📏 单次回复的最大 token 数。'),
-        timeout: Schema.number()
-          .min(1000)
-          .default(120000)
-          .description('⏱️ 请求超时时间（毫秒）。'),
       }),
+      Schema.string().description('🔌 通道名'),
     )
       .role('table')
       .description(
@@ -205,6 +203,26 @@ export const Config = Schema.intersect([
       '🪄 找不到匹配 key 时使用的通道名；留空则取表格第一项。',
     ),
   }).description('🔐 自定义 API 通道'),
+
+  // ==================
+  // ⚙️ 调用参数分组
+  // ==================
+  Schema.object({
+    temperature: Schema.number()
+      .min(0)
+      .max(2)
+      .step(0.05)
+      .default(0.65)
+      .description('🌡️ 自定义 API 的默认采样温度（0–2），越高越发散。'),
+    maxTokens: Schema.number()
+      .min(1)
+      .default(2048)
+      .description('📏 自定义 API 单次回复的最大 token 数。'),
+    timeout: Schema.number()
+      .min(1000)
+      .default(120000)
+      .description('⏱️ 自定义 API 的请求超时时间（毫秒）。'),
+  }).description('⚙️ 调用参数'),
 
   // ==================
   // 📂 模板数据分组
@@ -252,7 +270,6 @@ export const Config = Schema.intersect([
   // ==================
   Schema.object({
     cooldown: Schema.number()
-      .role('slider')
       .min(0)
       .max(300)
       .step(5)
@@ -265,26 +282,16 @@ export const Config = Schema.intersect([
   // ==================
   Schema.object({
     authority: Schema.object({
-      reload: Schema.natural()
-        .role('slider')
-        .max(5)
-        .default(4)
-        .description('🔄 重载模板目录。'),
+      reload: Schema.natural().max(5).default(4).description('🔄 重载模板目录。'),
       reset: Schema.natural()
-        .role('slider')
         .max(5)
         .default(4)
         .description('♻️ 重新释放内置模板（覆盖同名文件）。'),
       clone: Schema.natural()
-        .role('slider')
         .max(5)
         .default(3)
         .description('📄 复制一份模板到用户目录。'),
-      rm: Schema.natural()
-        .role('slider')
-        .max(5)
-        .default(3)
-        .description('🗑️ 删除用户目录里的模板。'),
+      rm: Schema.natural().max(5).default(3).description('🗑️ 删除用户目录里的模板。'),
     }).description('🛡️ 各管理命令所需的 Koishi authority 等级（0–5）。'),
   }).description('🛡️ 命令权限'),
 

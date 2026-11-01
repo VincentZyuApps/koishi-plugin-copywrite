@@ -1,6 +1,11 @@
 import type { Context, Logger } from 'koishi'
 
-import type { Config, CustomProvider, LlmMode } from '../config'
+import type {
+  Config,
+  CustomProvider,
+  LlmMode,
+  ResolvedProvider,
+} from '../config'
 import type { ChatMessage, LlmClient } from '../types'
 import { AnthropicClient } from './anthropic'
 import { ChatlunaClient, getChatlunaService } from './chatluna'
@@ -148,9 +153,16 @@ export class LlmRouter {
       throw new LlmUnavailableError('没有可用的自定义 API 通道')
     }
 
-    return found.provider.apiFormat === 'anthropic'
-      ? new AnthropicClient(this.ctx, found.provider, found.key)
-      : new OpenAiClient(this.ctx, found.provider, found.key)
+    const resolved: ResolvedProvider = {
+      ...found.provider,
+      temperature: this.config.temperature,
+      maxTokens: this.config.maxTokens,
+      timeout: this.config.timeout,
+    }
+
+    return resolved.apiFormat === 'anthropic'
+      ? new AnthropicClient(this.ctx, resolved, found.key)
+      : new OpenAiClient(this.ctx, resolved, found.key)
   }
 }
 
