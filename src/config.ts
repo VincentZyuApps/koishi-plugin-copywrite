@@ -16,8 +16,8 @@ export type LlmMode = keyof typeof LLM_MODES
 
 /** 🧩 自定义 API 的接口格式 */
 export const API_FORMATS = {
-  openai: '🧩 OpenAI 兼容（/v1/chat/completions）',
-  anthropic: '🧩 Anthropic（/v1/messages）',
+  openai: 'OpenAI 兼容',
+  anthropic: 'Anthropic',
 } as const
 
 export type ApiFormat = keyof typeof API_FORMATS
@@ -174,16 +174,12 @@ export const Config = Schema.intersect([
   Schema.object({
     customProviders: Schema.dict(
       Schema.object({
-        baseURL: Schema.string()
-          .required()
-          .description('🌐 接口地址，可带或不带 <code>/v1</code>。'),
+        baseURL: Schema.string().required().description('地址'),
         apiKey: Schema.string()
           .role('secret')
           .required()
-          .description('🔑 API Key，仅保存在本地配置中。'),
-        model: Schema.string().description(
-          '🤖 实际请求的模型名；留空则使用该条目在表格中的 key。',
-        ),
+          .description('API Key'),
+        model: Schema.string().description('模型'),
         apiFormat: Schema.union(
           (Object.keys(API_FORMATS) as ApiFormat[]).map((key) =>
             Schema.const(key).description(API_FORMATS[key]),
@@ -191,13 +187,22 @@ export const Config = Schema.intersect([
         )
           .role('radio')
           .default('openai')
-          .description('🧩 接口格式，决定请求路径与鉴权方式。'),
+          .description('格式'),
       }),
-      Schema.string().description('🔌 通道名'),
+      Schema.string().description('通道名'),
     )
       .role('table')
       .description(
-        '🔐 按模板里 <code>model</code> 字段索引的 API 通道表，结构与上游 <code>configs/chatgpt-vision/keys.yaml</code> 一致。',
+        [
+          '📋 表头已尽量精简，详细说明见下：',
+          '🔌 <b>通道名</b>：对应模板 YAML 里的 <code>model</code> 字段；一个通道可以被多个模板共用。',
+          '🌐 <b>地址</b>：可带或不带 <code>/v1</code>，插件会自动补全 <code>/chat/completions</code> 或 <code>/messages</code>。',
+          '🔑 <b>API Key</b>：只保存在本地配置中。',
+          '🤖 <b>模型</b>：实际请求的模型名，留空则直接使用通道名。',
+          `🧩 <b>格式</b>：<code>${API_FORMATS.openai}</code> 走 <code>/v1/chat/completions</code>；<code>${API_FORMATS.anthropic}</code> 走 <code>/v1/messages</code>。`,
+          '⚙️ 采样温度、最大 token 数与超时时间在「⚙️ 调用参数」分组里统一调整。',
+          '🧭 找不到对应通道时使用下方的默认通道；默认通道也留空则取表格第一行。',
+        ].join('<br/>'),
       ),
     defaultCustomProvider: Schema.string().description(
       '🪄 找不到匹配 key 时使用的通道名；留空则取表格第一项。',
