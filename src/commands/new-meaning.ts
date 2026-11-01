@@ -1,9 +1,7 @@
 import { h, type Context } from 'koishi'
 
-import {
-  DEFAULT_NEW_MEANING_COMMAND_NAME,
-  type Config,
-} from '../config'
+import type { Config } from '../config'
+import { DEFAULT_NEW_MEANING_COMMAND_NAME } from '../constants'
 import { LlmRouter } from '../llm'
 import { buildNewMeaningMessages } from '../prompts/new-meaning'
 import { extractSvg, svgToPng } from '../render'
@@ -28,6 +26,14 @@ export function registerNewMeaning(
     '用一个全新的角度解释汉语词汇',
   )
   if (aliases.length) command.alias(...aliases)
+
+  command.usage(
+    [
+      '🖼️ 用一个全新的角度解释一个汉语词汇，输出一张 SVG 卡片。',
+      `用法：${commandName} <词>`,
+      `示例：${commandName} 调休`,
+    ].join('\n'),
+  )
 
   command.action(async (_, word) => {
     const input = (word ?? '').trim()

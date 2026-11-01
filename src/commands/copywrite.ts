@@ -2,10 +2,8 @@ import path from 'node:path'
 
 import type { Context, Session } from 'koishi'
 
-import {
-  DEFAULT_COMMAND_NAME,
-  type Config,
-} from '../config'
+import type { Config } from '../config'
+import { DEFAULT_COMMAND_NAME } from '../constants'
 import {
   removePatternFile,
   writePatternFile,
@@ -14,6 +12,7 @@ import {
 import { LlmRouter } from '../llm'
 import { generateCopywrite } from '../prompt'
 import { resetPresets } from '../resources'
+import { buildHelpText } from './help'
 import {
   normalizeAliases,
   normalizeCommandName,
@@ -33,23 +32,37 @@ export function registerCopywrite(
   const aliases = normalizeAliases(config.commandAliases, commandName)
   const logger = ctx.logger('copywrite')
 
-  const command = ctx.command(`${commandName} [input:text]`, '生成定型文')
+  const command = ctx.command(
+    `${commandName} [type:string] [topic:text]`,
+    '生成定型文',
+  )
   if (aliases.length) command.alias(...aliases)
 
-  command.action(async ({ session }, input) => {
-    const raw = (input ?? '').trim()
-    if (!raw) return formatList(store)
+  // 让 --help 直接带上实时的文案结构与用法。
+  command.usage(async () => buildHelpText(store, config))
 
-    const head = raw.split(/\s+/, 1)[0]
-    const name = head.toLowerCase()
-    const rest = raw.slice(head.length).trim()
+  command.action(async ({ session }, type, topicText) => {
+    const rawType = (type ?? '').trim()
+    const rest = (topicText ?? '').trim()
+
+    if (!rawType) {
+      // 有 help 插件时复用它的渲染，保证与 --help 完全一致。
+      if (ctx.$commander.get('help')) {
+        return session.execute(`${commandName} --help`)
+      }
+      return buildHelpText(store, config)
+    }
+
+    const name = rawType.toLowerCase()
 
     if (RESERVED.has(name)) {
       return handleReserved(ctx, config, store, session, name, rest)
     }
 
     const entry = store.get(name)
-    if (!entry) return '没有找到该文案'
+    if (!entry) {
+      return `没有找到该文案。发送「${commandName}」查看全部类型。`
+    }
 
     if (!rest) return entry.help || '主题呢？'
 
@@ -227,14 +240,6 @@ async function hasAuthority(
 
 function isReadonly(store: PatternStore): boolean {
   return path.resolve(store.activeDir) !== path.resolve(store.presetDir)
-}
-
-function formatList(store: PatternStore): string {
-  const groups = store.groups()
-  if (!groups.length) return '好像一片空白？'
-  return groups
-    .map((group) => `${group.category}:\n  ${group.keys.join(', ')}`)
-    .join('\n')
 }
 
 function checkCooldown(

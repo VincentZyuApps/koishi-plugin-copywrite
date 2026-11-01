@@ -22,11 +22,19 @@ export const API_FORMATS = {
 
 export type ApiFormat = keyof typeof API_FORMATS
 
-/** 📌 默认指令名与别名 */
-export const DEFAULT_COMMAND_NAME = 'copywrite'
-export const DEFAULT_COMMAND_ALIASES = ['文案', '模仿文案']
-export const DEFAULT_NEW_MEANING_COMMAND_NAME = 'new-meaning'
-export const DEFAULT_NEW_MEANING_ALIASES = ['汉语新解']
+export {
+  DEFAULT_COMMAND_NAME,
+  DEFAULT_COMMAND_ALIASES,
+  DEFAULT_NEW_MEANING_COMMAND_NAME,
+  DEFAULT_NEW_MEANING_ALIASES,
+} from './constants'
+
+import {
+  DEFAULT_COMMAND_ALIASES,
+  DEFAULT_COMMAND_NAME,
+  DEFAULT_NEW_MEANING_ALIASES,
+  DEFAULT_NEW_MEANING_COMMAND_NAME,
+} from './constants'
 
 // ====================
 // 📋 配置接口定义
