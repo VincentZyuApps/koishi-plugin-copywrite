@@ -49,6 +49,27 @@ describe('parsePresetYaml', () => {
     expect(parsed.errors).toHaveLength(1)
   })
 
+  it('支持文件级 __model__，条目里的 model 仍然优先', () => {
+    const parsed = parsePresetYaml(
+      [
+        '__category__: X',
+        '__model__: sol',
+        '继承:',
+        '  examples:',
+        '    - ok',
+        '覆盖:',
+        '  examples:',
+        '    - ok',
+        '  model: luna',
+      ].join('\n'),
+      '/tmp/model.yaml',
+    )
+
+    expect(parsed.errors).toEqual([])
+    expect(parsed.patterns.find((item) => item.name === '继承')?.model).toBe('sol')
+    expect(parsed.patterns.find((item) => item.name === '覆盖')?.model).toBe('luna')
+  })
+
   it('非对象文件与坏 YAML 都不会抛异常', () => {
     expect(parsePresetYaml('- a\n- b', '/tmp/x.yaml').errors).toHaveLength(1)
     expect(parsePresetYaml('a: [1, 2', '/tmp/x.yaml').errors).toHaveLength(1)
@@ -75,13 +96,20 @@ describe('内置模板', () => {
     expect(result.errors).toEqual([])
   })
 
-  it('做好咯 保留了完整的示例', async () => {
+  it('真拿你没办法 保留了完整的示例与文件级模型', async () => {
     const result = await loadPresetDir(RESOURCES)
-    const entry = result.patterns.get('做好咯')
+    const entry = result.patterns.get('真拿你没办法')
 
     expect(entry).toBeDefined()
     expect(entry!.examples).toHaveLength(5)
     expect(entry!.examples[0]).toContain('DANK1NG')
+    expect(entry!.model).toBe('sol')
+    expect(
+      entry!.examples.every((example) => {
+        const lines = example.split('\n')
+        return lines[0] === '真拿你没办法，坐好喽。' && lines[1]?.startsWith('那是')
+      }),
+    ).toBe(true)
     expect(entry!.keywords).toBe(1)
   })
 })

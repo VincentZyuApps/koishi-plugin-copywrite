@@ -57,11 +57,18 @@ export function parsePresetYaml(text: string, source: string): ParsedFile {
       ? rawCategory.trim()
       : 'Default'
 
+  // 上游 0.3.2 起支持文件级的 __model__，作为该文件内所有条目的默认模型。
+  const rawModel = doc.__model__
+  const defaultModel =
+    typeof rawModel === 'string' && rawModel.trim()
+      ? rawModel.trim()
+      : DEFAULT_MODEL
+
   const patterns: PatternEntry[] = []
   const errors: string[] = []
 
   for (const [rawName, raw] of Object.entries(doc)) {
-    if (rawName === '__category__') continue
+    if (rawName === '__category__' || rawName === '__model__') continue
 
     const name = rawName.trim().toLowerCase()
     if (!name) {
@@ -69,7 +76,14 @@ export function parsePresetYaml(text: string, source: string): ParsedFile {
       continue
     }
 
-    const pattern = normalizePattern(raw, rawName.trim(), name, category, source)
+    const pattern = normalizePattern(
+      raw,
+      rawName.trim(),
+      name,
+      category,
+      source,
+      defaultModel,
+    )
     if (!pattern) {
       errors.push(`${path.basename(source)}: 「${rawName}」缺少有效的 examples，已跳过`)
       continue
@@ -87,6 +101,7 @@ function normalizePattern(
   name: string,
   category: string,
   source: string,
+  defaultModel = DEFAULT_MODEL,
 ): PatternEntry | null {
   if (!isRecord(raw)) return null
 
@@ -96,7 +111,7 @@ function normalizePattern(
   const model =
     typeof raw.model === 'string' && raw.model.trim()
       ? raw.model.trim()
-      : DEFAULT_MODEL
+      : defaultModel
 
   const addition = typeof raw.addition === 'string' ? raw.addition : ''
   const keywords =
