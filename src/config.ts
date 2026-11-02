@@ -152,7 +152,7 @@ export const Config = Schema.intersect([
     reasoningMaxChars: Schema.number()
       .min(200)
       .max(10000)
-      .step(100)
+      .step(1)
       .default(2222)
       .description(
         '✂️ 思考消息最大字符数。超出后保留开头 80%%、结尾 20%%，中间以「省略 N 字」代替。',
