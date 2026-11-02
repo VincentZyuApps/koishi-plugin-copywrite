@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   describeOpenAiFailure,
   inspectOpenAiResponse,
+  isTruncatedByReasoning,
+  nextMaxTokens,
 } from '../src/llm/openai-response'
 import { buildOpenAiPayload } from '../src/llm/openai'
 
@@ -108,5 +110,28 @@ describe('inspectOpenAiResponse', () => {
     })
 
     expect(describeOpenAiFailure(result, 2048)).toContain('思维链')
+  })
+})
+
+describe('截断重试辅助', () => {
+  it('只有 length + 空正文 + 思考才算截断', () => {
+    const base = {
+      text: '',
+      reasoning: '想了很多',
+      finishReason: 'length',
+      usage: undefined,
+      error: undefined,
+    }
+
+    expect(isTruncatedByReasoning(base)).toBe(true)
+    expect(isTruncatedByReasoning({ ...base, text: '正文' })).toBe(false)
+    expect(isTruncatedByReasoning({ ...base, reasoning: '' })).toBe(false)
+    expect(isTruncatedByReasoning({ ...base, finishReason: 'stop' })).toBe(false)
+  })
+
+  it('maxTokens 翻倍并封顶 10240', () => {
+    expect(nextMaxTokens(2048)).toBe(4096)
+    expect(nextMaxTokens(8192)).toBe(10240)
+    expect(nextMaxTokens(10240)).toBeNull()
   })
 })

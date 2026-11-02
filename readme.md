@@ -83,6 +83,11 @@ yarn add koishi-plugin-copywrite
 
 > 不同中转支持的取值可能不同。例如 CommandCode 只接受 `off|low|medium|high|xhigh|max`，传 `none` 会返回 400。
 
+输出被思考截断（`finish_reason=length` 且正文为空）时，插件会自动兜底，两个开关可独立关闭：
+
+- `retryWithoutReasoning`（默认开启）：先关闭思考重试一次
+- `retryWithMoreTokens`（默认开启）：关闭思考仍失败时，把 `maxTokens` 翻倍重试一次（OpenAI 上限 10240）
+
 ## 📝 模板格式
 
 ```yaml

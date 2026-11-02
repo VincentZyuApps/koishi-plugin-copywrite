@@ -6,6 +6,9 @@ import { LlmRequestError, LlmUnavailableError } from './errors'
 import {
   describeOpenAiFailure,
   inspectOpenAiResponse,
+  isTruncatedByReasoning,
+  nextMaxTokens,
+  type OpenAiInspection,
 } from './openai-response'
 
 export class OpenAiClient implements LlmClient {
@@ -32,7 +35,6 @@ export class OpenAiClient implements LlmClient {
       this.provider.baseURL,
       '/v1/chat/completions',
     )
-    const payload = buildOpenAiPayload(this.provider, request, model)
     const maxTokens = request.maxTokens ?? this.provider.maxTokens
     const options = {
       headers: {
@@ -42,7 +44,69 @@ export class OpenAiClient implements LlmClient {
       timeout: this.provider.timeout,
       signal: request.signal,
     }
+    const logger = this.ctx.logger('copywrite')
 
+    const attempt = (
+      provider: ResolvedProvider = this.provider,
+      tokens = maxTokens,
+    ) =>
+      this.post(
+        endpoint,
+        buildOpenAiPayload(provider, request, model),
+        tokens,
+        options,
+      )
+
+    const first = await attempt()
+    if (first.text.trim()) return toChatResult(first)
+    if (!isTruncatedByReasoning(first)) {
+      throw new LlmRequestError(describeOpenAiFailure(first, maxTokens))
+    }
+
+    const errors = [`首次请求：${describeOpenAiFailure(first, maxTokens)}`]
+
+    if (
+      this.provider.retryWithoutReasoning &&
+      this.provider.reasoningEffort !== 'off'
+    ) {
+      try {
+        logger.debug('输出被思考截断，尝试关闭思考重试')
+        const retried = await attempt({
+          ...this.provider,
+          reasoningEffort: 'off',
+        })
+        if (retried.text.trim()) return toChatResult(retried)
+        errors.push(`关闭思考重试：${describeOpenAiFailure(retried, maxTokens)}`)
+      } catch (error) {
+        errors.push(`关闭思考重试失败：${errorMessage(error)}`)
+      }
+    }
+
+    if (this.provider.retryWithMoreTokens) {
+      const next = nextMaxTokens(maxTokens)
+      if (next !== null) {
+        try {
+          logger.debug('尝试提高 maxTokens 到 %d 重试', next)
+          const retried = await attempt(this.provider, next)
+          if (retried.text.trim()) return toChatResult(retried)
+          errors.push(
+            `提高 maxTokens(${next}) 重试：${describeOpenAiFailure(retried, next)}`,
+          )
+        } catch (error) {
+          errors.push(`提高 maxTokens 重试失败：${errorMessage(error)}`)
+        }
+      }
+    }
+
+    throw new LlmRequestError(errors.join('\n'))
+  }
+
+  private async post(
+    endpoint: string,
+    payload: Record<string, unknown>,
+    maxTokens: number,
+    options: any,
+  ): Promise<OpenAiInspection> {
     let response: unknown
     try {
       response = await this.ctx.http.post(
@@ -71,16 +135,19 @@ export class OpenAiClient implements LlmClient {
       )
     }
 
-    const inspection = inspectOpenAiResponse(response)
-    if (!inspection.text.trim()) {
-      throw new LlmRequestError(describeOpenAiFailure(inspection, maxTokens))
-    }
-
-    return {
-      text: inspection.text.trim(),
-      reasoning: inspection.reasoning.trim() || undefined,
-    }
+    return inspectOpenAiResponse(response)
   }
+}
+
+function toChatResult(info: OpenAiInspection): ChatResult {
+  return {
+    text: info.text.trim(),
+    reasoning: info.reasoning.trim() || undefined,
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 /** 纯函数，方便单测；reasoningEffort 为 auto 时不发送该字段 */

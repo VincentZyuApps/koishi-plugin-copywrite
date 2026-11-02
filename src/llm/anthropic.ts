@@ -18,6 +18,11 @@ export interface AnthropicInspection {
   error: unknown
 }
 
+export interface AnthropicPayloadOptions {
+  disableThinking?: boolean
+  maxTokens?: number
+}
+
 export class AnthropicClient implements LlmClient {
   readonly kind = 'anthropic' as const
 
@@ -39,19 +44,90 @@ export class AnthropicClient implements LlmClient {
     if (!model) throw new LlmUnavailableError('没有指定模型名')
 
     const endpoint = appendEndpoint(this.provider.baseURL, '/v1/messages')
-    const payload = buildAnthropicPayload(this.provider, request, model)
+    const configuredMaxTokens = request.maxTokens ?? this.provider.maxTokens
+    const options = {
+      headers: {
+        'x-api-key': this.provider.apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      timeout: this.provider.timeout,
+      signal: request.signal,
+    }
+    const logger = this.ctx.logger('copywrite')
 
+    const attempt = (payloadOptions: AnthropicPayloadOptions = {}) =>
+      this.post(
+        endpoint,
+        buildAnthropicPayload(
+          this.provider,
+          request,
+          model,
+          payloadOptions,
+        ),
+        options,
+      )
+
+    const first = await attempt()
+    if (first.text.trim()) return toChatResult(first)
+    if (!isAnthropicTruncated(first)) {
+      throw new LlmRequestError(describeAnthropicFailure(first))
+    }
+
+    const errors = [`首次请求：${describeAnthropicFailure(first)}`]
+
+    if (
+      this.provider.retryWithoutReasoning &&
+      this.provider.reasoningEffort !== 'off'
+    ) {
+      try {
+        logger.debug('输出被思考截断，尝试关闭 Anthropic thinking 重试')
+        const retried = await attempt({
+          disableThinking: true,
+          maxTokens: configuredMaxTokens,
+        })
+        if (retried.text.trim()) return toChatResult(retried)
+        errors.push(`关闭思考重试：${describeAnthropicFailure(retried)}`)
+      } catch (error) {
+        errors.push(`关闭思考重试失败：${errorMessage(error)}`)
+      }
+    }
+
+    if (this.provider.retryWithMoreTokens) {
+      const budget =
+        this.provider.reasoningEffort &&
+        this.provider.reasoningEffort !== 'auto'
+          ? ANTHROPIC_THINKING_BUDGETS[this.provider.reasoningEffort]
+          : undefined
+      const current = budget
+        ? Math.max(configuredMaxTokens, budget + 2048)
+        : configuredMaxTokens
+      const cap = Math.max(10240, (budget ?? 0) + 2048)
+      const next = Math.min(cap, current * 2)
+
+      if (next > current) {
+        try {
+          logger.debug('尝试提高 Anthropic max_tokens 到 %d 重试', next)
+          const retried = await attempt({ maxTokens: next })
+          if (retried.text.trim()) return toChatResult(retried)
+          errors.push(`提高 maxTokens(${next}) 重试：${describeAnthropicFailure(retried)}`)
+        } catch (error) {
+          errors.push(`提高 maxTokens 重试失败：${errorMessage(error)}`)
+        }
+      }
+    }
+
+    throw new LlmRequestError(errors.join('\n'))
+  }
+
+  private async post(
+    endpoint: string,
+    payload: Record<string, unknown>,
+    options: any,
+  ): Promise<AnthropicInspection> {
     let response: unknown
     try {
-      response = await this.ctx.http.post(endpoint, payload, {
-        headers: {
-          'x-api-key': this.provider.apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        timeout: this.provider.timeout,
-        signal: request.signal,
-      })
+      response = await this.ctx.http.post(endpoint, payload, options)
     } catch (error) {
       throw new LlmRequestError(
         `Anthropic 接口请求失败：${describeError(error)}`,
@@ -65,15 +141,7 @@ export class AnthropicClient implements LlmClient {
       )
     }
 
-    const inspection = inspectAnthropicResponse(response)
-    if (!inspection.text.trim()) {
-      throw new LlmRequestError(describeAnthropicFailure(inspection))
-    }
-
-    return {
-      text: inspection.text.trim(),
-      reasoning: inspection.reasoning.trim() || undefined,
-    }
+    return inspectAnthropicResponse(response)
   }
 }
 
@@ -85,6 +153,7 @@ export function buildAnthropicPayload(
   >,
   request: Pick<ChatRequest, 'messages' | 'temperature' | 'maxTokens'>,
   model: string,
+  options: AnthropicPayloadOptions = {},
 ): Record<string, unknown> {
   const system = request.messages
     .filter((message) => message.role === 'system')
@@ -95,9 +164,12 @@ export function buildAnthropicPayload(
     .map((message) => message.content)
     .join('\n\n')
 
-  const configuredMaxTokens = request.maxTokens ?? provider.maxTokens
+  const configuredMaxTokens =
+    options.maxTokens ?? request.maxTokens ?? provider.maxTokens
   const budget =
-    provider.reasoningEffort && provider.reasoningEffort !== 'auto'
+    !options.disableThinking &&
+    provider.reasoningEffort &&
+    provider.reasoningEffort !== 'auto'
       ? ANTHROPIC_THINKING_BUDGETS[provider.reasoningEffort]
       : undefined
 
@@ -157,6 +229,15 @@ export function inspectAnthropicResponse(
   return result
 }
 
+/** 是否被思考内容截断 */
+export function isAnthropicTruncated(info: AnthropicInspection): boolean {
+  return (
+    info.stopReason === 'max_tokens' &&
+    !info.text.trim() &&
+    Boolean(info.reasoning.trim())
+  )
+}
+
 function describeAnthropicFailure(info: AnthropicInspection): string {
   if (info.error !== undefined && info.error !== null) {
     return `Anthropic 接口返回错误：${safeJson(info.error)}`
@@ -171,6 +252,17 @@ function describeAnthropicFailure(info: AnthropicInspection): string {
     return `Anthropic 只返回了思维链（${info.reasoning.length} 字），没有最终正文。`
   }
   return 'Anthropic 接口返回内容为空。'
+}
+
+function toChatResult(info: AnthropicInspection): ChatResult {
+  return {
+    text: info.text.trim(),
+    reasoning: info.reasoning.trim() || undefined,
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function safeJson(value: unknown): string {

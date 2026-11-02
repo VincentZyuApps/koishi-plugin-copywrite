@@ -166,6 +166,8 @@ export class LlmRouter {
       maxTokens: this.config.maxTokens,
       timeout: this.config.timeout,
       reasoningEffort: this.config.reasoningEffort,
+      retryWithoutReasoning: this.config.retryWithoutReasoning,
+      retryWithMoreTokens: this.config.retryWithMoreTokens,
     }
 
     return resolved.apiFormat === 'anthropic'

@@ -58,6 +58,8 @@ export interface RequestDefaults {
   maxTokens: number
   timeout: number
   reasoningEffort: ReasoningEffort
+  retryWithoutReasoning: boolean
+  retryWithMoreTokens: boolean
 }
 
 /** 🔌 通道 + 全局参数，客户端实际使用的形态 */
@@ -102,6 +104,8 @@ export interface Config {
   maxTokens: number
   timeout: number
   reasoningEffort: ReasoningEffort
+  retryWithoutReasoning: boolean
+  retryWithMoreTokens: boolean
 
   // 📂 模板数据
   presetDir: string
@@ -151,7 +155,7 @@ export const Config = Schema.intersect([
       ),
     reasoningMaxChars: Schema.number()
       .min(200)
-      .max(10000)
+      .max(10240)
       .step(1)
       .default(2222)
       .description(
@@ -288,6 +292,16 @@ export const Config = Schema.intersect([
       .default('auto')
       .description(
         '🧠 思考等级。auto 不发送 reasoning_effort；off 关闭思考；其余为具体强度。Anthropic 通道会映射为 thinking.budget_tokens。',
+      ),
+    retryWithoutReasoning: Schema.boolean()
+      .default(true)
+      .description(
+        '🔁 输出被思考截断（finish_reason=length 且正文为空）时，自动关闭思考重试一次。',
+      ),
+    retryWithMoreTokens: Schema.boolean()
+      .default(true)
+      .description(
+        '📈 关闭思考重试仍失败，或未开启上一项时，把 maxTokens 翻倍重试一次（OpenAI 上限 10240）。',
       ),
   }).description('⚙️ 调用参数'),
 

@@ -76,6 +76,24 @@ export function inspectOpenAiResponse(response: unknown): OpenAiInspection {
   return result
 }
 
+/** 是否被思考内容截断：没有正文，但思考把 token 用光了 */
+export function isTruncatedByReasoning(info: OpenAiInspection): boolean {
+  return (
+    info.finishReason === 'length' &&
+    !info.text.trim() &&
+    Boolean(info.reasoning.trim())
+  )
+}
+
+/** 下一次重试的 maxTokens；达到上限时返回 null */
+export function nextMaxTokens(
+  current: number,
+  cap = 10240,
+): number | null {
+  const next = Math.min(cap, current * 2)
+  return next > current ? next : null
+}
+
 export function describeOpenAiFailure(
   info: OpenAiInspection,
   maxTokens: number,

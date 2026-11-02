@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAnthropicPayload,
   inspectAnthropicResponse,
+  isAnthropicTruncated,
 } from '../src/llm/anthropic'
 
 const messages = [{ role: 'user' as const, content: 'hi' }]
@@ -43,6 +44,19 @@ describe('buildAnthropicPayload', () => {
     expect(payload.max_tokens).toBeGreaterThanOrEqual(1280 + 2048)
   })
 
+  it('disableThinking 时不发 thinking，温度回到配置值', () => {
+    const payload = buildAnthropicPayload(
+      { ...provider, reasoningEffort: 'high' },
+      { messages, maxTokens: 2048 },
+      'claude',
+      { disableThinking: true, maxTokens: 2048 },
+    )
+
+    expect(payload.thinking).toBeUndefined()
+    expect(payload.temperature).toBe(0.65)
+    expect(payload.max_tokens).toBe(2048)
+  })
+
   it('high 映射到 4096', () => {
     const payload = buildAnthropicPayload(
       { ...provider, reasoningEffort: 'high' },
@@ -79,5 +93,19 @@ describe('inspectAnthropicResponse', () => {
     })
 
     expect(result.error).toEqual({ message: 'bad request' })
+  })
+
+  it('截断判定：max_tokens + 空正文 + thinking', () => {
+    const base = {
+      text: '',
+      reasoning: '想过',
+      stopReason: 'max_tokens',
+      error: undefined,
+    }
+
+    expect(isAnthropicTruncated(base)).toBe(true)
+    expect(isAnthropicTruncated({ ...base, text: '正文' })).toBe(false)
+    expect(isAnthropicTruncated({ ...base, reasoning: '' })).toBe(false)
+    expect(isAnthropicTruncated({ ...base, stopReason: 'end_turn' })).toBe(false)
   })
 })
