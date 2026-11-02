@@ -398,7 +398,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stream", action="store_true", help="使用 SSE 流式请求")
     parser.add_argument("--show-prompt", action="store_true", help="打印完整 prompt")
     parser.add_argument("--dump", help="把原始响应保存到文件")
+    parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=JSON",
+        help=(
+            "附加到请求体的顶层字段，可重复。值按 JSON 解析，"
+            "解析失败则按字符串处理，例如 --param reasoning_effort=off"
+        ),
+    )
+    parser.add_argument(
+        "--params-file",
+        help="从 JSON 文件读取附加请求体字段（必须是对象）；与 --param 同时使用时 --param 优先",
+    )
     return parser.parse_args()
+
+
+def parse_params(items: list[str]) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    for item in items:
+        if "=" not in item:
+            raise ValueError(f"--param 需要 KEY=VALUE 格式：{item}")
+        key, raw = item.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"--param 的 key 不能为空：{item}")
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            value = raw
+        params[key] = value
+    return params
 
 
 def main() -> int:
@@ -460,6 +491,29 @@ def main() -> int:
         "max_tokens": args.max_tokens,
     }
 
+    extra_params: dict[str, Any] = {}
+
+    if args.params_file:
+        try:
+            loaded = json.loads(
+                Path(args.params_file).read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"读取 --params-file 失败：{error}", file=sys.stderr)
+            return 2
+        if not isinstance(loaded, dict):
+            print("--params-file 的内容必须是 JSON 对象。", file=sys.stderr)
+            return 2
+        extra_params.update(loaded)
+
+    try:
+        extra_params.update(parse_params(args.param))
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+
+    payload.update(extra_params)
+
     print(f"endpoint      : {endpoint}")
     print(f"model         : {model}")
     print(f"apiKey        : {mask_key(api_key)}")
@@ -468,6 +522,8 @@ def main() -> int:
         f"max_tokens    : {args.max_tokens}    "
         f"temperature: {args.temperature}    stream: {args.stream}"
     )
+    if extra_params:
+        print(f"extra params  : {json.dumps(extra_params, ensure_ascii=False)}")
     if args.show_prompt:
         print("--- prompt begin ---")
         print(prompt)

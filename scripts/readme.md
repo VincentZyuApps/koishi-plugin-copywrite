@@ -106,6 +106,37 @@ uv run scripts/test_api.py ... --prompt-file prompt.txt --dump response.json
 | `--stream` | 关 | 使用 SSE 流式请求 |
 | `--show-prompt` | 关 | 打印完整 prompt |
 | `--dump` | — | 保存原始响应；`--repeat > 1` 时会带序号 |
+| `--param` | — | 附加请求体顶层字段，可重复，如 `--param reasoning_effort=off` |
+| `--params-file` | — | 从 JSON 对象文件读取附加字段；与 `--param` 同时使用时 `--param` 优先 |
+
+## 关闭思考（reasoning_effort）
+
+CommandCode / goat 上游接受 `reasoning_effort`，实测合法值为：
+
+```text
+off | low | medium | high | xhigh | max
+```
+
+`off` 会完全关闭思考，`reasoning_tokens` 为 0，普通文案不再被思维链吃满 `max_tokens`：
+
+```powershell
+uv run scripts/test_api.py `
+  --base-url http://laoke.vincentzyu233.cn:10102/v1 `
+  --api-key sk-xxx `
+  --model deepseek/deepseek-v4-flash-vision-exp `
+  --prompt-file prompt.txt `
+  --param reasoning_effort=off
+```
+
+注意：
+
+- `reasoning_effort=none` 是**无效值**，上游会返回 400，并提示合法值为 `off|low|medium|high|xhigh|max`
+- PowerShell 5.1 会吃掉参数里的双引号，需要传 JSON 对象时请用 `--params-file`：
+  ```powershell
+  # params.json
+  # {"reasoning_effort":"off"}
+  uv run scripts/test_api.py ... --params-file params.json
+  ```
 
 ## 输出怎么读
 
