@@ -1,15 +1,12 @@
 import type { Context } from 'koishi'
 
 import type { ResolvedProvider } from '../config'
-import { isRecord, type ChatRequest, type LlmClient } from '../types'
+import type { ChatRequest, ChatResult, LlmClient } from '../types'
 import { LlmRequestError, LlmUnavailableError } from './errors'
-
-interface OpenAiResponse {
-  choices?: Array<{
-    finish_reason?: string | null
-    message?: { content?: unknown }
-  }>
-}
+import {
+  describeOpenAiFailure,
+  inspectOpenAiResponse,
+} from './openai-response'
 
 export class OpenAiClient implements LlmClient {
   readonly kind = 'openai' as const
@@ -27,7 +24,7 @@ export class OpenAiClient implements LlmClient {
     return this.provider.model || this.fallbackModel || ''
   }
 
-  async chat(request: ChatRequest): Promise<string> {
+  async chat(request: ChatRequest): Promise<ChatResult> {
     const model = request.model || this.model
     if (!model) throw new LlmUnavailableError('没有指定模型名')
 
@@ -35,11 +32,7 @@ export class OpenAiClient implements LlmClient {
       this.provider.baseURL,
       '/v1/chat/completions',
     )
-    const payload = {
-      model,
-      messages: request.messages,
-      temperature: request.temperature ?? this.provider.temperature,
-    }
+    const payload = buildOpenAiPayload(this.provider, request, model)
     const maxTokens = request.maxTokens ?? this.provider.maxTokens
     const options = {
       headers: {
@@ -50,9 +43,9 @@ export class OpenAiClient implements LlmClient {
       signal: request.signal,
     }
 
-    let response: OpenAiResponse | string
+    let response: unknown
     try {
-      response = await this.ctx.http.post<OpenAiResponse | string>(
+      response = await this.ctx.http.post(
         endpoint,
         { ...payload, max_tokens: maxTokens },
         options,
@@ -62,7 +55,7 @@ export class OpenAiClient implements LlmClient {
         throw requestError('OpenAI 兼容接口', error)
       }
       try {
-        response = await this.ctx.http.post<OpenAiResponse | string>(
+        response = await this.ctx.http.post(
           endpoint,
           { ...payload, max_completion_tokens: maxTokens },
           options,
@@ -78,12 +71,38 @@ export class OpenAiClient implements LlmClient {
       )
     }
 
-    const content = readOpenAiContent(response?.choices?.[0]?.message?.content)
-    if (!content.trim()) {
-      throw new LlmRequestError('OpenAI 兼容接口返回内容为空')
+    const inspection = inspectOpenAiResponse(response)
+    if (!inspection.text.trim()) {
+      throw new LlmRequestError(describeOpenAiFailure(inspection, maxTokens))
     }
-    return content.trim()
+
+    return {
+      text: inspection.text.trim(),
+      reasoning: inspection.reasoning.trim() || undefined,
+    }
   }
+}
+
+/** 纯函数，方便单测；reasoningEffort 为 auto 时不发送该字段 */
+export function buildOpenAiPayload(
+  provider: Pick<
+    ResolvedProvider,
+    'temperature' | 'maxTokens' | 'reasoningEffort'
+  >,
+  request: Pick<ChatRequest, 'messages' | 'temperature'>,
+  model: string,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    model,
+    messages: request.messages,
+    temperature: request.temperature ?? provider.temperature,
+  }
+
+  if (provider.reasoningEffort && provider.reasoningEffort !== 'auto') {
+    payload.reasoning_effort = provider.reasoningEffort
+  }
+
+  return payload
 }
 
 export function appendEndpoint(baseURL: string, endpoint: string): string {
@@ -115,23 +134,6 @@ export function appendEndpoint(baseURL: string, endpoint: string): string {
 function isCompleteEndpoint(pathname: string, endpoint: string): boolean {
   const tail = endpoint.split('/').pop()
   return Boolean(tail) && pathname.endsWith(`/${tail}`)
-}
-
-function readOpenAiContent(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return ''
-
-  return content
-    .map((part) => {
-      if (typeof part === 'string') return part
-      if (!isRecord(part)) return ''
-      if (typeof part.text === 'string') return part.text
-      if (isRecord(part.text) && typeof part.text.value === 'string') {
-        return part.text.value
-      }
-      return ''
-    })
-    .join('')
 }
 
 function shouldRetryWithMaxCompletionTokens(error: unknown): boolean {

@@ -38,11 +38,20 @@ export interface ChatRequest {
 }
 
 /**
+ * 一次模型调用的结果：正文与思考严格分开。
+ * 正文只放最终回答，思考内容永远不混进 text。
+ */
+export interface ChatResult {
+  text: string
+  reasoning?: string
+}
+
+/**
  * LLM 通道的统一抽象，chatluna / openai / anthropic 各自实现。
  */
 export interface LlmClient {
   readonly kind: 'chatluna' | 'openai' | 'anthropic'
-  chat(request: ChatRequest): Promise<string>
+  chat(request: ChatRequest): Promise<ChatResult>
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

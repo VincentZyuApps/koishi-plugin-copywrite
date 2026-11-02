@@ -1,6 +1,6 @@
 import type { Context } from 'koishi'
 
-import { isRecord, type ChatMessage, type ChatRequest, type LlmClient } from '../types'
+import { isRecord, type ChatMessage, type ChatRequest, type ChatResult, type LlmClient } from '../types'
 import { LlmRequestError, LlmUnavailableError } from './errors'
 
 /**
@@ -54,7 +54,7 @@ export class ChatlunaClient implements LlmClient {
     return new ChatlunaClient(model, modelName)
   }
 
-  async chat(request: ChatRequest): Promise<string> {
+  async chat(request: ChatRequest): Promise<ChatResult> {
     try {
       const messages = await buildMessages(request.messages)
       const result = messages
@@ -62,8 +62,12 @@ export class ChatlunaClient implements LlmClient {
         : await this.model.invoke(flattenMessages(request.messages))
 
       const text = readContent(result?.content ?? result)
+      const reasoning = readReasoning(result)
       if (!text.trim()) throw new Error('模型返回内容为空')
-      return text.trim()
+      return {
+        text: text.trim(),
+        reasoning: reasoning.trim() || undefined,
+      }
     } catch (error) {
       throw new LlmRequestError(
         `ChatLuna 请求失败：${error instanceof Error ? error.message : String(error)}`,
@@ -115,6 +119,26 @@ function readContent(content: unknown): string {
       return ''
     })
     .join('')
+}
+
+function readReasoning(result: unknown): string {
+  if (!isRecord(result)) return ''
+
+  const kwargs = result.additional_kwargs
+  if (isRecord(kwargs)) {
+    const value =
+      readContent(kwargs.reasoning_content) || readContent(kwargs.reasoning)
+    if (value) return value
+  }
+
+  const metadata = result.response_metadata
+  if (isRecord(metadata)) {
+    return (
+      readContent(metadata.reasoning_content) || readContent(metadata.reasoning)
+    )
+  }
+
+  return ''
 }
 
 /**

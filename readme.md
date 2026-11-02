@@ -60,6 +60,9 @@ yarn add koishi-plugin-copywrite
 
 - **引用触发消息**：`enableQuote`（默认开启）作用于所有指令回复，包括帮助、列表、错误与生成结果。
 - **等待提示**：`enableWaitingHint`（默认开启）只在调用模型时发送「正在生成」提示，完成后自动撤回。
+- **思考消息**：`sendReasoning`（默认关闭）开启后在正文之前单独发送模型的思考过程。
+- **思考消息走 QQ Markdown**：`enableReasoningViaQQMarkdown`（默认关闭）仅对 `platform = qq` 生效，用 `> xxx` 引用块发送思考消息；正文始终是普通文本。
+- **思考消息长度**：`reasoningMaxChars`（默认 `2222`）超出后保留开头 80%、结尾 20%，中间以「省略 N 字」代替。
 
 ## 🤖 模型接入
 
@@ -70,7 +73,15 @@ yarn add koishi-plugin-copywrite
 
 四种模式：仅 ChatLuna、仅自定义、先 ChatLuna 后自定义、先自定义后 ChatLuna。默认先 ChatLuna，没装则自动回退自定义。
 
-自定义 API 的温度、最大 token 数和超时是全局配置，在「⚙️ 调用参数」里调整。
+自定义 API 的温度、最大 token 数、超时和思考等级是全局配置，在「⚙️ 调用参数」里调整。
+
+思考等级支持 `auto` / `off` / `low` / `medium` / `high` / `xhigh` / `max`：
+
+- `auto`：不发送 `reasoning_effort`，由上游决定
+- `off`：关闭思考（CommandCode / goat 实测有效，`reasoning_tokens` 归零）
+- 其余为具体强度；Anthropic 通道会映射为 `thinking.budget_tokens`
+
+> 不同中转支持的取值可能不同。例如 CommandCode 只接受 `off|low|medium|high|xhigh|max`，传 `none` 会返回 400。
 
 ## 📝 模板格式
 

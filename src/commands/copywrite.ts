@@ -13,6 +13,7 @@ import { LlmRouter } from '../llm'
 import { generateCopywrite } from '../prompt'
 import { resetPresets } from '../resources'
 import { buildHelpText } from './help'
+import { sendReasoningMessage } from './reasoning'
 import { recallHint, sendWaitingHint, withQuote } from './reply'
 import {
   normalizeAliases,
@@ -108,16 +109,17 @@ export function registerCopywrite(
       '⏳ 正在生成文案，请稍候…',
     )
 
+    let result
     try {
-      const result = await router.chat(entry, [
-        { role: 'user', content: prompt },
-      ])
-      return result.text
+      result = await router.chat(entry, [{ role: 'user', content: prompt }])
     } catch (error) {
-      return `发生错误: ${errorMessage(error)}`
-    } finally {
       await recallHint(ctx, session, hintId)
+      return `发生错误: ${errorMessage(error)}`
     }
+
+    await recallHint(ctx, session, hintId)
+    await sendReasoningMessage(ctx, session, config, result.reasoning)
+    return result.text
   }
 }
 

@@ -18,6 +18,7 @@ export type LlmVia = 'chatluna' | 'custom'
 
 export interface RouteResult {
   text: string
+  reasoning?: string
   via: LlmVia
   /** chatluna 模式是模型名，custom 模式是 customProviders 的 key */
   channel: string
@@ -99,7 +100,7 @@ export class LlmRouter {
       const startedAt = Date.now()
       try {
         const client = await this.create(via, model)
-        const text = await client.chat({ messages })
+        const result = await client.chat({ messages })
         const channel =
           via === 'chatluna'
             ? this.chatlunaModelName(model)
@@ -107,14 +108,20 @@ export class LlmRouter {
 
         if (this.config.verboseLog) {
           this.logger.info(
-            'verbose route: %s → %s (%dms)',
+            'verbose route: %s → %s (%dms, reasoning=%d 字)',
             via,
             channel || '(未指定)',
             Date.now() - startedAt,
+            result.reasoning?.length ?? 0,
           )
         }
 
-        return { text, via, channel }
+        return {
+          text: result.text,
+          reasoning: result.reasoning,
+          via,
+          channel,
+        }
       } catch (error) {
         if (!(error instanceof LlmUnavailableError) && !this.config.fallbackOnError) {
           if (this.config.verboseLog) {
@@ -158,6 +165,7 @@ export class LlmRouter {
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens,
       timeout: this.config.timeout,
+      reasoningEffort: this.config.reasoningEffort,
     }
 
     return resolved.apiFormat === 'anthropic'

@@ -34,6 +34,9 @@ import {
   DEFAULT_COMMAND_NAME,
   DEFAULT_NEW_MEANING_ALIASES,
   DEFAULT_NEW_MEANING_COMMAND_NAME,
+  REASONING_EFFORTS,
+  REASONING_EFFORT_LABELS,
+  type ReasoningEffort,
 } from './constants'
 
 // ====================
@@ -54,6 +57,7 @@ export interface RequestDefaults {
   temperature: number
   maxTokens: number
   timeout: number
+  reasoningEffort: ReasoningEffort
 }
 
 /** 🔌 通道 + 全局参数，客户端实际使用的形态 */
@@ -71,6 +75,9 @@ export interface Config {
   // 💬 消息发送
   enableQuote: boolean
   enableWaitingHint: boolean
+  sendReasoning: boolean
+  enableReasoningViaQQMarkdown: boolean
+  reasoningMaxChars: number
 
   // 📌 指令配置
   commandName: string
@@ -94,6 +101,7 @@ export interface Config {
   temperature: number
   maxTokens: number
   timeout: number
+  reasoningEffort: ReasoningEffort
 
   // 📂 模板数据
   presetDir: string
@@ -132,6 +140,22 @@ export const Config = Schema.intersect([
       .default(true)
       .description(
         '⏳ 调用模型生成文案 / 汉语新解时，是否先发送「正在生成」提示，完成后自动撤回。',
+      ),
+    sendReasoning: Schema.boolean()
+      .default(false)
+      .description('🧠 是否在正文之前单独发送模型的思考过程。思考为空时跳过。'),
+    enableReasoningViaQQMarkdown: Schema.boolean()
+      .default(false)
+      .description(
+        '🧾 仅在 QQ 官方 Bot 平台发送思考消息时使用 Markdown 引用块（&gt; xxx）。正文始终以普通文本发送。',
+      ),
+    reasoningMaxChars: Schema.number()
+      .min(200)
+      .max(10000)
+      .step(100)
+      .default(2222)
+      .description(
+        '✂️ 思考消息最大字符数。超出后保留开头 80%%、结尾 20%%，中间以「省略 N 字」代替。',
       ),
   }).description('💬 消息发送'),
 
@@ -226,7 +250,7 @@ export const Config = Schema.intersect([
           '🔑 <b>API Key</b>：只保存在本地配置中。',
           '🤖 <b>模型</b>：实际请求的模型名，留空则直接使用通道名。',
           `🧩 <b>格式</b>：<code>${API_FORMATS.openai}</code> 走 <code>/v1/chat/completions</code>；<code>${API_FORMATS.anthropic}</code> 走 <code>/v1/messages</code>。`,
-          '⚙️ 采样温度、最大 token 数与超时时间在「⚙️ 调用参数」分组里统一调整。',
+          '⚙️ 采样温度、最大 token 数、超时时间与思考等级在「⚙️ 调用参数」分组里统一调整。',
           '🧭 找不到对应通道时使用下方的默认通道；默认通道也留空则取表格第一行。',
         ].join('<br/>'),
       ),
@@ -253,6 +277,18 @@ export const Config = Schema.intersect([
       .min(1000)
       .default(120000)
       .description('⏱️ 自定义 API 的请求超时时间（毫秒）。'),
+    reasoningEffort: Schema.union(
+      REASONING_EFFORTS.map((key) =>
+        Schema.const(key).description(
+          `🧠 ${key}：${REASONING_EFFORT_LABELS[key]}`,
+        ),
+      ),
+    )
+      .role('radio')
+      .default('auto')
+      .description(
+        '🧠 思考等级。auto 不发送 reasoning_effort；off 关闭思考；其余为具体强度。Anthropic 通道会映射为 thinking.budget_tokens。',
+      ),
   }).description('⚙️ 调用参数'),
 
   // ==================
