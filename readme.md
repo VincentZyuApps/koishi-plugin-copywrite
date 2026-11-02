@@ -33,8 +33,16 @@
 
 ## 📦 安装
 
+使用 Yarn：
+
 ```sh
 yarn add koishi-plugin-copywrite
+```
+
+使用 npm：
+
+```sh
+npm install koishi-plugin-copywrite
 ```
 
 启用后会自动把内置模板释放到 `data/copywrite/presets/`，开箱即用。
