@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Config } from '../src/config'
-import { buildHelpText } from '../src/commands/help'
+import {
+  buildHelpText,
+  displayWidth,
+  formatUsageRows,
+} from '../src/commands/help'
 import type { PatternEntry } from '../src/types'
 
 function entry(
@@ -32,6 +36,34 @@ const config = {
   commandName: 'copywrite',
   authority: { reload: 4, reset: 4, clone: 3, rm: 3 },
 } as Config
+
+describe('displayWidth', () => {
+  it('ASCII 算 1，中文与全角符号算 2', () => {
+    expect(displayWidth('abc')).toBe(3)
+    expect(displayWidth('类型')).toBe(4)
+    expect(displayWidth('【类型】')).toBe(8)
+  })
+})
+
+describe('formatUsageRows', () => {
+  it('描述文本从同一列开始', () => {
+    const specs: Array<[string, string]> = [
+      ['copywrite 【类型】', 'a'],
+      ['copywrite 【类型】 【题材】', 'b'],
+      ['copywrite reload', 'c'],
+    ]
+    const rows = formatUsageRows(specs)
+    const expected = Math.max(...specs.map(([syntax]) => displayWidth(syntax))) + 2
+
+    rows.forEach((row, index) => {
+      const desc = specs[index][1]
+      const prefix = row.slice(0, row.length - desc.length)
+
+      expect(prefix.startsWith('  ')).toBe(true)
+      expect(displayWidth(prefix)).toBe(2 + expected)
+    })
+  })
+})
 
 describe('buildHelpText', () => {
   it('按分类列出模板并带上总数', () => {
@@ -69,9 +101,15 @@ describe('buildHelpText', () => {
       authority: { reload: 5, reset: 5, clone: 2, rm: 2 },
     } as Config)
 
-    expect(text).toContain('模仿文案 <类型> <题材>')
+    expect(text).toContain('模仿文案 【类型】 【题材】')
     expect(text).toContain('权限 5')
     expect(text).toContain('权限 2')
     expect(text).toContain('好像一片空白？')
+  })
+
+  it('输出里不再出现尖括号，避免被消息解析吃掉', () => {
+    const text = buildHelpText(source([entry('做好咯', 'VincentZyu')]), config)
+    expect(text).not.toContain('<')
+    expect(text).not.toContain('>')
   })
 })

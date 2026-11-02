@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-copywrite",
   "description": "定型文生成器：用 LLM 模仿示例文案的措辞生成新文案",
-  "version": "0.1.1-beta.6+20261101",
+  "version": "0.1.2-beta.7+20261102",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [

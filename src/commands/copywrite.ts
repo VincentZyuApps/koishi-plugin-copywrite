@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import type { Context, Session } from 'koishi'
+import type { Context, Fragment, Session } from 'koishi'
 
 import type { Config } from '../config'
 import { DEFAULT_COMMAND_NAME } from '../constants'
@@ -13,6 +13,7 @@ import { LlmRouter } from '../llm'
 import { generateCopywrite } from '../prompt'
 import { resetPresets } from '../resources'
 import { buildHelpText } from './help'
+import { recallHint, sendWaitingHint, withQuote } from './reply'
 import {
   normalizeAliases,
   normalizeCommandName,
@@ -33,7 +34,7 @@ export function registerCopywrite(
   const logger = ctx.logger('copywrite')
 
   const command = ctx.command(
-    `${commandName} [type:string] [topic:text]`,
+    `${commandName} [类型:string] [题材:text]`,
     '生成定型文',
   )
   if (aliases.length) command.alias(...aliases)
@@ -42,12 +43,21 @@ export function registerCopywrite(
   command.usage(async () => buildHelpText(store, config))
 
   command.action(async ({ session }, type, topicText) => {
+    const output = await run(session, type, topicText)
+    return withQuote(session, config.enableQuote, output)
+  })
+
+  async function run(
+    session: Session | undefined,
+    type: string | undefined,
+    topicText: string | undefined,
+  ): Promise<Fragment> {
     const rawType = (type ?? '').trim()
     const rest = (topicText ?? '').trim()
 
     if (!rawType) {
       // 有 help 插件时复用它的渲染，保证与 --help 完全一致。
-      if (ctx.$commander.get('help')) {
+      if (session && ctx.$commander.get('help')) {
         return session.execute(`${commandName} --help`)
       }
       return buildHelpText(store, config)
@@ -91,6 +101,13 @@ export function registerCopywrite(
       )
     }
 
+    const hintId = await sendWaitingHint(
+      session,
+      config.enableWaitingHint,
+      config.enableQuote,
+      '⏳ 正在生成文案，请稍候…',
+    )
+
     try {
       const result = await router.chat(entry, [
         { role: 'user', content: prompt },
@@ -98,8 +115,10 @@ export function registerCopywrite(
       return result.text
     } catch (error) {
       return `发生错误: ${errorMessage(error)}`
+    } finally {
+      await recallHint(ctx, session, hintId)
     }
-  })
+  }
 }
 
 async function handleReserved(

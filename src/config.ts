@@ -68,6 +68,10 @@ export interface AuthorityConfig {
 }
 
 export interface Config {
+  // 💬 消息发送
+  enableQuote: boolean
+  enableWaitingHint: boolean
+
   // 📌 指令配置
   commandName: string
   commandAliases: string[]
@@ -117,6 +121,20 @@ export interface Config {
 // ====================
 
 export const Config = Schema.intersect([
+  // ==================
+  // 💬 消息发送分组
+  // ==================
+  Schema.object({
+    enableQuote: Schema.boolean()
+      .default(true)
+      .description('💬 bot 发送所有指令结果时，是否引用触发指令的消息。'),
+    enableWaitingHint: Schema.boolean()
+      .default(true)
+      .description(
+        '⏳ 调用模型生成文案 / 汉语新解时，是否先发送「正在生成」提示，完成后自动撤回。',
+      ),
+  }).description('💬 消息发送'),
+
   // ==================
   // 📌 指令配置分组
   // ==================
