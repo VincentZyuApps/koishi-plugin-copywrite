@@ -27,7 +27,9 @@
 
 ## 🖼️ 预览
 
-![你说的对](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/preview-shuodedui.png)
+![你说的对](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/preview-%E4%BD%A0%E8%AF%B4%E5%BE%97%E5%AF%B9.png)
+
+👉 [查看更多预览](https://github.com/VincentZyuApps/koishi-plugin-copywrite/blob/main/docs/preview.md)
 
 ## 📦 安装
 
