@@ -11,13 +11,13 @@
     "NOTICE"
   ],
   "license": "Apache-2.0",
-  "homepage": "https://github.com/VincentZyu233/koishi-plugin-copywrite",
+  "homepage": "https://github.com/VincentZyuApps/koishi-plugin-copywrite",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/VincentZyu233/koishi-plugin-copywrite.git"
+    "url": "git+https://github.com/VincentZyuApps/koishi-plugin-copywrite.git"
   },
   "bugs": {
-    "url": "https://github.com/VincentZyu233/koishi-plugin-copywrite/issues"
+    "url": "https://github.com/VincentZyuApps/koishi-plugin-copywrite/issues"
   },
   "keywords": [
     "chatbot",
