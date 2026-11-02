@@ -10,6 +10,7 @@
 *.yaml linguist-detectable linguist-language=YAML
 *.yml  linguist-detectable linguist-language=YAML
 
-# Markdown 在 Linguist 里属于 prose 类型，默认不计入语言统计，这里也打开。
-*.md       linguist-detectable linguist-language=Markdown
-*.markdown linguist-detectable linguist-language=Markdown
+# Markdown 在 Linguist 里属于 prose 类型，且 README 会被归为 documentation 排除。
+# 这里同时取消 documentation 标记并打开 detectable。
+*.md       -linguist-documentation linguist-detectable linguist-language=Markdown
+*.markdown -linguist-documentation linguist-detectable linguist-language=Markdown
