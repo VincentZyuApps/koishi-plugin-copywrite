@@ -6,7 +6,7 @@ import {
   buildOverviewText,
   displayWidth,
   formatUsageRows,
-} from '../src/commands/help'
+} from '../src/utils/help'
 import type { PatternEntry } from '../src/types'
 
 function entry(

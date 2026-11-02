@@ -4,7 +4,7 @@ import type { Config } from '../config'
 import type { PatternStore } from '../data'
 import type { LlmRouter } from '../llm'
 import { registerCopywrite } from './copywrite'
-import { registerNewMeaning } from './new-meaning'
+import { registerNewMeaning } from './newmeaning'
 
 export function registerCommands(
   ctx: Context,

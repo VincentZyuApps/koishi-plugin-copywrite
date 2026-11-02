@@ -14,17 +14,27 @@ import {
 } from '../data'
 import { LlmRouter } from '../llm'
 import { generateCopywrite } from '../prompt'
+import { sendCopywriteButtons } from '../qq'
 import { resetPresets } from '../resources'
-import { buildOverviewText } from './help'
-import { sendReasoningMessage } from './reasoning'
-import { recallHint, sendWaitingHint, withQuote } from './reply'
+import type { PatternEntry } from '../types'
+import { buildOverviewText } from '../utils/help'
+import { sendReasoningMessage } from '../utils/reasoning'
+import { recallHint, sendWaitingHint, withQuote } from '../utils/reply'
 import {
   normalizeAliases,
   normalizeCommandName,
   splitKeywords,
-} from './utils'
+} from '../utils/command'
 
 const RESERVED = new Set(['reload', 'reset', 'clone', 'rm', 'remove', 'delete'])
+
+type ResultKind = 'generated' | 'help' | 'entry-help' | 'error' | 'reserved'
+
+interface RunResult {
+  content: Fragment
+  kind: ResultKind
+  entry?: PatternEntry
+}
 
 export function registerCopywrite(
   ctx: Context,
@@ -47,41 +57,92 @@ export function registerCopywrite(
   // 模板列表与用法由裸指令单独发送。
 
   command.action(async ({ session }, type, topicText) => {
-    const output = await run(session, type, topicText)
-    return withQuote(session, config.enableQuote, output)
+    const result = await run(session, type, topicText)
+    const output = withQuote(session, config.enableQuote, result.content)
+
+    const wantsButtons =
+      !!session &&
+      config.enableQQButtons &&
+      session.platform === 'qq' &&
+      (result.kind === 'generated' ||
+        result.kind === 'help' ||
+        result.kind === 'entry-help')
+
+    if (!wantsButtons) return output
+
+    // 先发正文，再追加一条独立的按钮消息，保证顺序在最后。
+    try {
+      await session!.send(output)
+    } catch (error) {
+      logger.debug('发送正文失败：%s', errorMessage(error))
+      return output
+    }
+
+    try {
+      await sendCopywriteButtons(session, config, store, result.entry?.name)
+    } catch (error) {
+      const reason = errorMessage(error)
+      logger.error('QQ 按钮发送失败：%s', reason)
+      try {
+        await session!.send(
+          withQuote(
+            session,
+            config.enableQuote,
+            `⚠️ QQ 按钮发送失败：${reason}`,
+          ),
+        )
+      } catch (sendError) {
+        logger.error('发送按钮错误提示失败：%s', errorMessage(sendError))
+      }
+    }
+    return ''
   })
 
   async function run(
     session: Session | undefined,
     type: string | undefined,
     topicText: string | undefined,
-  ): Promise<Fragment> {
+  ): Promise<RunResult> {
     const rawType = (type ?? '').trim()
     const rest = (topicText ?? '').trim()
 
     if (!rawType) {
       // 注意不要用 session.execute('--help')：它默认会自己发送结果，
       // 外层再拼引用就会变成「一条纯文本 + 一条只有引用的消息」。
-      return buildOverviewText(command, aliases, store, config)
+      return {
+        content: buildOverviewText(command, aliases, store, config),
+        kind: 'help',
+      }
     }
 
     const name = rawType.toLowerCase()
 
     if (RESERVED.has(name)) {
-      return handleReserved(ctx, config, store, session, name, rest)
+      return {
+        content: await handleReserved(ctx, config, store, session, name, rest),
+        kind: 'reserved',
+      }
     }
 
     const entry = store.get(name)
     if (!entry) {
-      return `没有找到该文案。发送「${commandName}」查看全部类型。`
+      return {
+        content: `没有找到该文案。发送「${commandName}」查看全部类型。`,
+        kind: 'error',
+      }
     }
 
-    if (!rest) return entry.help || '主题呢？'
+    if (!rest) {
+      return { content: entry.help || '主题呢？', kind: 'entry-help', entry }
+    }
 
     const parts = splitKeywords(rest, entry.keywords)
     if (parts.length < entry.keywords) {
       const hint = `需要有${entry.keywords - parts.length}个关键词。`
-      return entry.help ? `${hint}\n\n${entry.help}` : hint
+      return {
+        content: entry.help ? `${hint}\n\n${entry.help}` : hint,
+        kind: 'error',
+      }
     }
 
     const topic = parts[parts.length - 1]
@@ -89,7 +150,10 @@ export function registerCopywrite(
 
     const cooldown = checkCooldown(session, config.cooldown, cooldowns)
     if (!cooldown.ok) {
-      return `冷却中，请 ${cooldown.remaining} 秒后再试。`
+      return {
+        content: `冷却中，请 ${cooldown.remaining} 秒后再试。`,
+        kind: 'error',
+      }
     }
 
     const prompt = generateCopywrite(entry, topic, keywords)
@@ -115,12 +179,15 @@ export function registerCopywrite(
       result = await router.chat(entry, [{ role: 'user', content: prompt }])
     } catch (error) {
       await recallHint(ctx, session, hintId)
-      return `发生错误: ${errorMessage(error)}`
+      return {
+        content: `发生错误: ${errorMessage(error)}`,
+        kind: 'error',
+      }
     }
 
     await recallHint(ctx, session, hintId)
     await sendReasoningMessage(ctx, session, config, result.reasoning)
-    return result.text
+    return { content: result.text, kind: 'generated', entry }
   }
 }
 
@@ -167,7 +234,7 @@ async function handleReserved(
       if (!(await hasAuthority(ctx, session, config.authority.rm))) {
         return '没有权限哦。'
       }
-      return remove(store, session, rest)
+      return remove(store, session, rest, config.enableQuote)
     }
 
     default:
@@ -205,6 +272,7 @@ async function remove(
   store: PatternStore,
   session: Session | undefined,
   rest: string,
+  quote: boolean,
 ): Promise<string> {
   const name = rest.split(/\s+/)[0]
   if (!name) return '用法：/文案 rm <名字>'
@@ -213,7 +281,11 @@ async function remove(
   if (!entry) return '没有找到该文案'
   if (isReadonly(store)) return '当前为只读模式，无法删除模板。'
 
-  const confirmed = await confirm(session, `回复 Y 确认删除「${entry.rawName}」`)
+  const confirmed = await confirm(
+    session,
+    `回复 Y 确认删除「${entry.rawName}」`,
+    quote,
+  )
   if (confirmed === null) return '已取消。'
   if (!confirmed) return '已取消。'
 
@@ -231,10 +303,11 @@ async function remove(
 async function confirm(
   session: Session | undefined,
   hint: string,
+  quote: boolean,
 ): Promise<boolean | null> {
   if (!session?.prompt) return true
 
-  await session.send(hint)
+  await session.send(withQuote(session, quote, hint))
   const answer = await session.prompt(30_000)
   if (!answer) return null
 

@@ -38,6 +38,7 @@ import {
   REASONING_EFFORT_LABELS,
   type ReasoningEffort,
 } from './constants'
+import { DEFAULT_BUTTON_ROWS, stringifyCompact } from './qq'
 
 // ====================
 // 📋 配置接口定义
@@ -80,6 +81,8 @@ export interface Config {
   sendReasoning: boolean
   enableReasoningViaQQMarkdown: boolean
   reasoningMaxChars: number
+  enableQQButtons: boolean
+  qqButtonsJson: string
 
   // 📌 指令配置
   commandName: string
@@ -160,6 +163,17 @@ export const Config = Schema.intersect([
       .default(2222)
       .description(
         '✂️ 思考消息最大字符数。超出后保留开头 80%%、结尾 20%%，中间以「省略 N 字」代替。',
+      ),
+    enableQQButtons: Schema.boolean()
+      .default(true)
+      .description(
+        '🤖 仅在 QQ 官方 Bot 平台：每次回复后追加「查看文案 / 再来一条」按钮消息（群聊点击只会填入输入框）。',
+      ),
+    qqButtonsJson: Schema.string()
+      .role('textarea', { rows: [5, 10] })
+      .default(stringifyCompact(DEFAULT_BUTTON_ROWS))
+      .description(
+        '📋 QQ 按钮 JSON 配置<br><em>支持变量：<code>${commandName}</code> <code>${randomType}</code>；为空或 JSON 无效时不会发送按钮，并会在聊天中提示。</em>',
       ),
   }).description('💬 消息发送'),
 

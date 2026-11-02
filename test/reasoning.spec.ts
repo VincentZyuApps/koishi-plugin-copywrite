@@ -4,7 +4,7 @@ import {
   formatReasoningMessage,
   toBlockquote,
   truncateMiddle,
-} from '../src/commands/reasoning-format'
+} from '../src/utils/reasoning'
 
 describe('truncateMiddle', () => {
   it('不超过上限时原样返回', () => {

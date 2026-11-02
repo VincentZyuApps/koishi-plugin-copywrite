@@ -3,11 +3,11 @@ import { h, type Context, type Fragment, type Session } from 'koishi'
 import type { Config } from '../config'
 import { DEFAULT_NEW_MEANING_COMMAND_NAME } from '../constants'
 import { LlmRouter } from '../llm'
-import { buildNewMeaningMessages } from '../prompts/new-meaning'
+import { buildNewMeaningMessages } from '../prompts/newmeaning'
 import { extractSvg, svgToPng } from '../render'
-import { sendReasoningMessage } from './reasoning'
-import { recallHint, sendWaitingHint, withQuote } from './reply'
-import { normalizeAliases, normalizeCommandName } from './utils'
+import { sendReasoningMessage } from '../utils/reasoning'
+import { recallHint, sendWaitingHint, withQuote } from '../utils/reply'
+import { normalizeAliases, normalizeCommandName } from '../utils/command'
 
 export function registerNewMeaning(
   ctx: Context,

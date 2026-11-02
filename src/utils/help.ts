@@ -1,7 +1,7 @@
 import { DEFAULT_COMMAND_DESCRIPTION, DEFAULT_COMMAND_NAME } from '../constants'
 import type { Config } from '../config'
 import type { PatternEntry } from '../types'
-import { normalizeCommandName } from './utils'
+import { normalizeCommandName } from './command'
 
 /** buildHelpText 只需要这两样能力，方便单测注入替身 */
 export interface HelpSource {

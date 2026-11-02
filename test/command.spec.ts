@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizeAliases, normalizeCommandName } from '../src/commands/utils'
+import { normalizeAliases, normalizeCommandName } from '../src/utils/command'
 
 describe('normalizeCommandName', () => {
   it('空值回退默认值', () => {

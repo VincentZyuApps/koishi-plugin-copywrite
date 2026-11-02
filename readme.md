@@ -65,6 +65,7 @@ yarn add koishi-plugin-copywrite
 - **思考消息**：`sendReasoning`（默认关闭）开启后在正文之前单独发送模型的思考过程。
 - **思考消息走 QQ Markdown**：`enableReasoningViaQQMarkdown`（默认关闭）仅对 `platform = qq` 生效，用 `> xxx` 引用块发送思考消息；正文始终是普通文本。
 - **思考消息长度**：`reasoningMaxChars`（默认 `2222`）超出后保留开头 80%、结尾 20%，中间以「省略 N 字」代替。
+- **QQ 官方 Bot 按钮**：`enableQQButtons`（默认开启）仅在 `platform = qq` 时，于帮助/生成结果后追加一条「查看文案 / 再来一条」按钮消息；群聊点击只会把指令填入输入框。按钮 JSON 可在 `qqButtonsJson` 里调整，支持变量 `${commandName}`、`${randomType}`；为空或 JSON 无效时不会发送按钮，并在聊天中提示。
 
 ## 🤖 模型接入
 

@@ -1,3 +1,7 @@
+import type { Context, Session } from 'koishi'
+
+import type { Config } from '../config'
+
 /**
  * 把过长的思考文本截断：保留开头 80% 与结尾 20%，中间用「省略 N 字」代替。
  * 纯函数，不依赖 koishi，方便单测。
@@ -40,4 +44,44 @@ export function toBlockquote(text: string): string {
     .split(/\r?\n/)
     .map((line) => (line.length ? `> ${line}` : '>'))
     .join('\n')
+}
+
+/**
+ * 在正文之前单独发送思考消息。
+ * 失败时只记 debug 日志，绝不影响正文。
+ */
+export async function sendReasoningMessage(
+  ctx: Context,
+  session: Session | undefined,
+  config: Config,
+  reasoning: string | undefined,
+): Promise<void> {
+  if (!config.sendReasoning || !session) return
+
+  const text = (reasoning ?? '').trim()
+  if (!text) return
+
+  const content = formatReasoningMessage(text, config.reasoningMaxChars)
+
+  // 延迟加载，保证格式化函数可以在不引入 koishi 运行时的单测里使用。
+  const [{ sendQQMarkdown }, { withQuote }] = await Promise.all([
+    import('../qq'),
+    import('./reply'),
+  ])
+
+  if (config.enableReasoningViaQQMarkdown && session.platform === 'qq') {
+    const sent = await sendQQMarkdown(session, toBlockquote(content))
+    if (sent) return
+  }
+
+  try {
+    await session.send(withQuote(session, config.enableQuote, content))
+  } catch (error) {
+    ctx
+      .logger('copywrite')
+      .debug(
+        '发送思考消息失败：%s',
+        error instanceof Error ? error.message : String(error),
+      )
+  }
 }

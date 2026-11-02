@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Config, CustomProvider } from '../src/config'
-import { splitKeywords } from '../src/commands/utils'
+import { splitKeywords } from '../src/utils/command'
 import { LlmRouter, resolveOrder } from '../src/llm'
 import { appendEndpoint } from '../src/llm/openai'
 import type { Context } from 'koishi'

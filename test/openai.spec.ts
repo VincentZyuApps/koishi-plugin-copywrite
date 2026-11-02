@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildOpenAiPayload,
   describeOpenAiFailure,
   inspectOpenAiResponse,
   isTruncatedByReasoning,
   nextMaxTokens,
-} from '../src/llm/openai-response'
-import { buildOpenAiPayload } from '../src/llm/openai'
+} from '../src/llm/openai'
 
 const messages = [{ role: 'user' as const, content: 'hi' }]
 
