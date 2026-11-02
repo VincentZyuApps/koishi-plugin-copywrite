@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-copywrite",
-  "description": "定型文生成器：用 LLM 模仿示例文案的措辞生成新文案",
+  "description": "📝 定型文生成器：用 LLM 模仿示例文案的措辞生成新文案（移植自 nonebot-plugin-copywrite） ✨",
   "version": "0.1.2-beta.8+20261102",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -49,8 +49,8 @@
   },
   "koishi": {
     "description": {
-      "en": "Generate copywriting by mimicking example texts with an LLM.",
-      "zh": "定型文生成器：用 LLM 模仿示例文案的措辞生成新文案。"
+      "en": "📝 Generate copywriting by mimicking example texts with an LLM (ported from nonebot-plugin-copywrite) ✨",
+      "zh": "📝 定型文生成器：用 LLM 模仿示例文案的措辞生成新文案（移植自 nonebot-plugin-copywrite） ✨"
     },
     "service": {
       "required": [
