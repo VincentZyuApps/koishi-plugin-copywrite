@@ -1,5 +1,7 @@
 > 💡 推荐前往 [GitHub](https://github.com/VincentZyuApps/koishi-plugin-copywrite) 或 [Gitee](https://gitee.com/vincent-zyu/koishi-plugin-copywrite) 阅读 README，体验更好。
 
+> **[📖 查看完整更新日志 →](./CHANGELOG.md)**
+
 ![koishi-plugin-copywrite](https://socialify.git.ci/VincentZyuApps/koishi-plugin-copywrite/image?description=1&font=Bitter&forks=1&issues=1&language=1&logo=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Ff%2Ff3%2FKoishi.js_Logo.png&name=1&owner=1&pattern=Plus&pulls=1&stargazers=1&theme=Auto)
 
 # 📝 koishi-plugin-copywrite
@@ -24,6 +26,8 @@
 定型文生成器。给一段示例文案，再给一个主题，让大模型照着它的措辞和语气写一篇新的。
 
 移植自 [nonebot-plugin-copywrite](https://github.com/Yan-Zero/nonebot-plugin-copywrite)，感谢原作者 [Yan-Zero](https://github.com/Yan-Zero) 的文案模板与 prompt 设计。
+
+> **[📖 查看完整更新日志 →](./CHANGELOG.md)**
 
 ## 🖼️ 预览
 
