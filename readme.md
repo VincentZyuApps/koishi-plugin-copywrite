@@ -25,6 +25,10 @@
 
 移植自 [nonebot-plugin-copywrite](https://github.com/Yan-Zero/nonebot-plugin-copywrite)，感谢原作者 [Yan-Zero](https://github.com/Yan-Zero) 的文案模板与 prompt 设计。
 
+## 🖼️ 预览
+
+![你说的对](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/preview-shuodedui.png)
+
 ## 📦 安装
 
 ```sh
