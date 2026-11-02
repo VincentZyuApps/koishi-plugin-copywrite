@@ -1,4 +1,4 @@
-import { DEFAULT_COMMAND_NAME } from '../constants'
+import { DEFAULT_COMMAND_DESCRIPTION, DEFAULT_COMMAND_NAME } from '../constants'
 import type { Config } from '../config'
 import type { PatternEntry } from '../types'
 import { normalizeCommandName } from './utils'
@@ -38,8 +38,9 @@ export function formatUsageRows(
 }
 
 /**
- * `文案` 与 `文案 --help` 共用的说明文本：
+ * 裸指令（`文案`）发送的说明文本：
  * 前半部分是实时的模板结构，后半部分是用法。
+ * `--help` 不走这里，交给 Koishi 原生 help 渲染。
  */
 export function buildHelpText(store: HelpSource, config: Config): string {
   const commandName = normalizeCommandName(
@@ -103,9 +104,36 @@ export function buildHelpText(store: HelpSource, config: Config): string {
   )
   lines.push('')
   lines.push(
-    `💡 直接发送「${commandName}」或「${commandName} --help」都会显示这份说明。`,
+    `💡 发送「${commandName} --help」查看指令语法与选项。`,
   )
 
+  return lines.join('\n')
+}
+
+/** 裸指令需要展示的最小指令元信息，方便单测注入替身 */
+export interface CommandLike {
+  readonly displayName: string
+  readonly declaration: string
+}
+
+/**
+ * 裸指令的完整输出：补上 help 插件原生会显示的三行头，再接模板列表与用法。
+ * 不要用 `session.execute('--help')` 拼这段——`Session.execute` 默认会自己发送结果。
+ */
+export function buildOverviewText(
+  command: CommandLike,
+  aliases: readonly string[],
+  store: HelpSource,
+  config: Config,
+): string {
+  const lines = [
+    `指令：${command.displayName}${command.declaration}`,
+    DEFAULT_COMMAND_DESCRIPTION,
+  ]
+
+  if (aliases.length) lines.push(`别名：${aliases.join('，')}。`)
+
+  lines.push(buildHelpText(store, config))
   return lines.join('\n')
 }
 

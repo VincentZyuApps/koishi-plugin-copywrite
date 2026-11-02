@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Config } from '../src/config'
 import {
   buildHelpText,
+  buildOverviewText,
   displayWidth,
   formatUsageRows,
 } from '../src/commands/help'
@@ -111,5 +112,39 @@ describe('buildHelpText', () => {
     const text = buildHelpText(source([entry('做好咯', 'VincentZyu')]), config)
     expect(text).not.toContain('<')
     expect(text).not.toContain('>')
+  })
+
+  it('末尾提示改为查看 --help，而不是两者同文', () => {
+    const text = buildHelpText(source([]), config)
+    expect(text).toContain('发送「copywrite --help」查看指令语法与选项')
+    expect(text).not.toContain('都会显示这份说明')
+  })
+})
+
+describe('buildOverviewText', () => {
+  const command = {
+    displayName: 'copywrite',
+    declaration: ' [类型] [题材]',
+  }
+
+  it('先给出指令、描述与别名，再接模板列表和用法', () => {
+    const text = buildOverviewText(
+      command,
+      ['文案', '模仿文案'],
+      source([entry('做好咯', 'VincentZyu')]),
+      config,
+    )
+
+    expect(text).toContain('指令：copywrite [类型] [题材]')
+    expect(text).toContain('生成定型文')
+    expect(text).toContain('别名：文案，模仿文案。')
+    expect(text).toContain('📚 可用文案（共 1 条）')
+    expect(text.indexOf('别名：')).toBeLessThan(text.indexOf('📚'))
+  })
+
+  it('没有别名时不输出别名行', () => {
+    const text = buildOverviewText(command, [], source([]), config)
+    expect(text).not.toContain('别名：')
+    expect(text).toContain('好像一片空白？')
   })
 })

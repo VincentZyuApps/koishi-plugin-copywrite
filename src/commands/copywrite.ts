@@ -3,7 +3,10 @@ import path from 'node:path'
 import type { Context, Fragment, Session } from 'koishi'
 
 import type { Config } from '../config'
-import { DEFAULT_COMMAND_NAME } from '../constants'
+import {
+  DEFAULT_COMMAND_DESCRIPTION,
+  DEFAULT_COMMAND_NAME,
+} from '../constants'
 import {
   removePatternFile,
   writePatternFile,
@@ -12,7 +15,7 @@ import {
 import { LlmRouter } from '../llm'
 import { generateCopywrite } from '../prompt'
 import { resetPresets } from '../resources'
-import { buildHelpText } from './help'
+import { buildOverviewText } from './help'
 import { sendReasoningMessage } from './reasoning'
 import { recallHint, sendWaitingHint, withQuote } from './reply'
 import {
@@ -36,12 +39,12 @@ export function registerCopywrite(
 
   const command = ctx.command(
     `${commandName} [类型:string] [题材:text]`,
-    '生成定型文',
+    DEFAULT_COMMAND_DESCRIPTION,
   )
   if (aliases.length) command.alias(...aliases)
 
-  // 让 --help 直接带上实时的文案结构与用法。
-  command.usage(async () => buildHelpText(store, config))
+  // 不设置 command.usage：--help 只保留 Koishi 原生的语法与选项提示，
+  // 模板列表与用法由裸指令单独发送。
 
   command.action(async ({ session }, type, topicText) => {
     const output = await run(session, type, topicText)
@@ -57,11 +60,9 @@ export function registerCopywrite(
     const rest = (topicText ?? '').trim()
 
     if (!rawType) {
-      // 有 help 插件时复用它的渲染，保证与 --help 完全一致。
-      if (session && ctx.$commander.get('help')) {
-        return session.execute(`${commandName} --help`)
-      }
-      return buildHelpText(store, config)
+      // 注意不要用 session.execute('--help')：它默认会自己发送结果，
+      // 外层再拼引用就会变成「一条纯文本 + 一条只有引用的消息」。
+      return buildOverviewText(command, aliases, store, config)
     }
 
     const name = rawType.toLowerCase()
