@@ -67,6 +67,18 @@ export function registerNewMeaning(
       )
     }
 
+    if (config.verboseLog && session) {
+      logger.info(
+        'verbose new-meaning request: platform=%s selfId=%s channel=%s word=%s',
+        session.platform,
+        (session as unknown as { selfId?: string }).selfId ??
+          (session.bot as unknown as { selfId?: string })?.selfId ??
+          '(unknown)',
+        session.channelId,
+        input,
+      )
+    }
+
     const hintId = await sendWaitingHint(
       session,
       config.enableWaitingHint,

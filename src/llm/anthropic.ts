@@ -156,7 +156,25 @@ export class AnthropicClient implements LlmClient {
       )
     }
 
-    return inspectAnthropicResponse(response)
+    const info = inspectAnthropicResponse(response)
+    if (this.provider.verboseLog) {
+      const root = isRecord(response) ? response : {}
+      const content = Array.isArray(root.content) ? root.content : []
+      const types = content
+        .filter(isRecord)
+        .map((part) => String(part.type ?? 'unknown'))
+      this.ctx.logger('copywrite').info(
+        'verbose response: model=%s stop=%s text=%d reasoning=%d contentTypes=[%s] usage=%o',
+        typeof root.model === 'string' ? root.model : '(unknown)',
+        info.stopReason ?? 'unknown',
+        info.text.length,
+        info.reasoning.length,
+        types.join(','),
+        root.usage,
+      )
+    }
+
+    return info
   }
 }
 

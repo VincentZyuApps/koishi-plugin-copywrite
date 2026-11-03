@@ -65,6 +65,7 @@ export interface RequestDefaults {
   retryWithoutReasoning: boolean
   retryWithMoreTokens: boolean
   truncateBehavior: TruncateBehavior
+  verboseLog: boolean
 }
 
 /** 🔌 通道 + 全局参数，客户端实际使用的形态 */

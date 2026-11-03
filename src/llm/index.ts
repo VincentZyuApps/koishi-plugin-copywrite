@@ -176,6 +176,7 @@ export class LlmRouter {
       retryWithoutReasoning: this.config.retryWithoutReasoning,
       retryWithMoreTokens: this.config.retryWithMoreTokens,
       truncateBehavior: this.config.truncateBehavior,
+      verboseLog: this.config.verboseLog,
     }
 
     return resolved.apiFormat === 'anthropic'

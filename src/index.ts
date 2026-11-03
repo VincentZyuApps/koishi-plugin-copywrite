@@ -45,6 +45,17 @@ export function apply(ctx: Context, config: Config) {
   })
 
   ctx.on('ready', async () => {
+    logger.info(
+      'effective config: maxTokens=%d reasoningEffort=%s truncate=%s retryWithout=%s retryMore=%s sendReasoning=%s markdownReasoning=%s',
+      config.maxTokens,
+      config.reasoningEffort,
+      config.truncateBehavior,
+      config.retryWithoutReasoning,
+      config.retryWithMoreTokens,
+      config.sendReasoning,
+      config.enableReasoningViaQQMarkdown,
+    )
+
     try {
       const release = await store.start()
       if (release.writable && release.copied.length) {

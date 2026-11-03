@@ -143,7 +143,30 @@ export class OpenAiClient implements LlmClient {
       )
     }
 
-    return inspectOpenAiResponse(response)
+    const info = inspectOpenAiResponse(response)
+    if (this.provider.verboseLog) {
+      const root = isRecord(response) ? response : {}
+      const choice =
+        Array.isArray(root.choices) && isRecord(root.choices[0])
+          ? root.choices[0]
+          : {}
+      const message = isRecord(choice.message)
+        ? choice.message
+        : isRecord(choice.delta)
+          ? choice.delta
+          : {}
+      this.ctx.logger('copywrite').info(
+        'verbose response: model=%s finish=%s text=%d reasoning=%d messageKeys=[%s] usage=%o',
+        typeof root.model === 'string' ? root.model : '(unknown)',
+        info.finishReason ?? 'unknown',
+        info.text.length,
+        info.reasoning.length,
+        Object.keys(message).join(','),
+        info.usage,
+      )
+    }
+
+    return info
   }
 }
 

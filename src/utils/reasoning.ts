@@ -58,26 +58,53 @@ export async function sendReasoningMessage(
   config: Config,
   reasoning: string | undefined,
 ): Promise<void> {
-  if (!config.sendReasoning || !session) return
+  const logger = ctx.logger('copywrite')
+  if (!session) {
+    if (config.verboseLog) logger.info('verbose reasoning skipped: no session')
+    return
+  }
+
+  const selfId =
+    (session as unknown as { selfId?: string }).selfId ??
+    (session.bot as unknown as { selfId?: string })?.selfId ??
+    '(unknown)'
+
+  if (config.verboseLog) {
+    logger.info(
+      'verbose reasoning: platform=%s selfId=%s channel=%s enabled=%s length=%d',
+      session.platform,
+      selfId,
+      session.channelId,
+      config.sendReasoning,
+      reasoning?.length ?? 0,
+    )
+  }
+
+  if (!config.sendReasoning) return
 
   const text = (reasoning ?? '').trim()
-  if (!text) return
+  if (!text) {
+    if (config.verboseLog) logger.info('verbose reasoning skipped: empty')
+    return
+  }
 
   const content = formatReasoningMessage(text, config.reasoningMaxChars)
 
   if (config.enableReasoningViaQQMarkdown && session.platform === 'qq') {
     const sent = await sendQQMarkdown(session, toBlockquote(content))
+    if (config.verboseLog) {
+      logger.info('verbose reasoning qq markdown: sent=%s', sent)
+    }
     if (sent) return
   }
 
   try {
     await session.send(withQuote(session, config.enableQuote, content))
+    if (config.verboseLog) logger.info('verbose reasoning sent: plain')
   } catch (error) {
-    ctx
-      .logger('copywrite')
-      .debug(
-        '发送思考消息失败：%s',
-        error instanceof Error ? error.message : String(error),
-      )
+    logger.warn(
+      '发送思考消息失败：%s',
+      error instanceof Error ? error.message : String(error),
+    )
   }
 }
