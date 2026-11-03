@@ -33,7 +33,7 @@
 
 > 你说得对，但是 koishi-plugin-copywrite 定型文生成器是由 Koishi 社区开发者打造的一款全新文案仿写插件。插件运行在一个被称作「示例文案」的语言世界中，在这里，被用户选中的人将被授予「主题」，导引措辞与语气之力。用户将扮演一位名为「生成器」的神秘角色，在自由的仿写中邂逅风格各异、腔调独特的示例文案们，和它们一起提炼句式、复刻语气，生成贴合主题的新文案——同时，逐步发掘「定型文生成」的真相。
 
-![你说的对](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/preview-%E4%BD%A0%E8%AF%B4%E5%BE%97%E5%AF%B9.png)
+![你说的对](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/copywrite/preview-%E4%BD%A0%E8%AF%B4%E5%BE%97%E5%AF%B9.png)
 
 👉 [查看更多预览](https://github.com/VincentZyuApps/koishi-plugin-copywrite/blob/main/docs/preview.md)
 
@@ -100,10 +100,15 @@ npm install koishi-plugin-copywrite
 
 > 不同中转支持的取值可能不同。例如 CommandCode 只接受 `off|low|medium|high|xhigh|max`，传 `none` 会返回 400。
 
-输出被思考截断（`finish_reason=length` 且正文为空）时，插件会自动兜底，两个开关可独立关闭：
+输出被截断（`finish_reason=length` / `stop_reason=max_tokens`，无论是否已有部分正文）时，插件会自动兜底，两个开关可独立关闭：
 
 - `retryWithoutReasoning`（默认开启）：先关闭思考重试一次
-- `retryWithMoreTokens`（默认开启）：关闭思考仍失败时，把 `maxTokens` 翻倍重试一次（OpenAI 上限 10240）
+- `retryWithMoreTokens`（默认开启）：关闭思考仍失败时，把 `maxTokens` 翻倍重试一次（OpenAI 上限 10240，默认值 5120 下会提到 10240）
+
+重试后仍然截断时，由 `truncateBehavior` 决定：
+
+- `partial`（默认）：返回最后一次的半截内容；汉语新解若没有完整 SVG 会提示输出被截断
+- `error`：直接报错，不返回半截内容
 
 ## 📝 模板格式
 

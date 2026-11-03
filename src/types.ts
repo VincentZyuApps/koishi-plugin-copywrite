@@ -44,6 +44,8 @@ export interface ChatRequest {
 export interface ChatResult {
   text: string
   reasoning?: string
+  /** OpenAI 的 finish_reason / Anthropic 的 stop_reason */
+  finishReason?: string | null
 }
 
 /**

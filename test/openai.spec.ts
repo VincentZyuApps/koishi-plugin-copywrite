@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ResolvedProvider } from '../src/config'
 import {
   buildOpenAiPayload,
   describeOpenAiFailure,
   inspectOpenAiResponse,
-  isTruncatedByReasoning,
+  isTruncatedOutput,
   nextMaxTokens,
+  OpenAiClient,
 } from '../src/llm/openai'
 
 const messages = [{ role: 'user' as const, content: 'hi' }]
@@ -114,7 +116,7 @@ describe('inspectOpenAiResponse', () => {
 })
 
 describe('截断重试辅助', () => {
-  it('只有 length + 空正文 + 思考才算截断', () => {
+  it('只要 finish_reason=length 就算截断', () => {
     const base = {
       text: '',
       reasoning: '想了很多',
@@ -123,15 +125,85 @@ describe('截断重试辅助', () => {
       error: undefined,
     }
 
-    expect(isTruncatedByReasoning(base)).toBe(true)
-    expect(isTruncatedByReasoning({ ...base, text: '正文' })).toBe(false)
-    expect(isTruncatedByReasoning({ ...base, reasoning: '' })).toBe(false)
-    expect(isTruncatedByReasoning({ ...base, finishReason: 'stop' })).toBe(false)
+    expect(isTruncatedOutput(base)).toBe(true)
+    expect(isTruncatedOutput({ ...base, text: '正文' })).toBe(true)
+    expect(isTruncatedOutput({ ...base, reasoning: '' })).toBe(true)
+    expect(isTruncatedOutput({ ...base, finishReason: 'stop' })).toBe(false)
   })
 
   it('maxTokens 翻倍并封顶 10240', () => {
     expect(nextMaxTokens(2048)).toBe(4096)
+    expect(nextMaxTokens(5120)).toBe(10240)
     expect(nextMaxTokens(8192)).toBe(10240)
     expect(nextMaxTokens(10240)).toBeNull()
+  })
+})
+
+function fakeProvider(
+  overrides: Partial<ResolvedProvider> = {},
+): ResolvedProvider {
+  return {
+    baseURL: 'https://example.com',
+    apiKey: 'key',
+    model: 'model',
+    apiFormat: 'openai',
+    temperature: 0.65,
+    maxTokens: 5120,
+    timeout: 1000,
+    reasoningEffort: 'auto',
+    retryWithoutReasoning: true,
+    retryWithMoreTokens: true,
+    truncateBehavior: 'partial',
+    ...overrides,
+  }
+}
+
+function fakeCtx(responses: unknown[]) {
+  let calls = 0
+  const ctx = {
+    http: {
+      post: async () => responses[Math.min(calls++, responses.length - 1)],
+    },
+    logger: () => ({
+      debug() {},
+      info() {},
+      warn() {},
+      error() {},
+    }),
+  }
+  return { ctx: ctx as never, calls: () => calls }
+}
+
+function truncated(text: string) {
+  return {
+    choices: [
+      {
+        finish_reason: 'length',
+        message: { content: text, reasoning_content: '想了很多' },
+      },
+    ],
+  }
+}
+
+describe('truncateBehavior', () => {
+  it('partial 返回最后一次的半截内容，并重试两次', async () => {
+    const { ctx, calls } = fakeCtx([truncated('半截正文')])
+    const client = new OpenAiClient(ctx, fakeProvider(), 'model')
+    const result = await client.chat({ messages })
+
+    expect(result.text).toBe('半截正文')
+    expect(result.finishReason).toBe('length')
+    expect(calls()).toBe(3)
+  })
+
+  it('error 直接抛错', async () => {
+    const { ctx } = fakeCtx([truncated('半截正文')])
+    const client = new OpenAiClient(
+      ctx,
+      fakeProvider({ truncateBehavior: 'error' }),
+      'model',
+    )
+
+    await expect(client.chat({ messages })).rejects.toThrow('max_tokens')
   })
 })

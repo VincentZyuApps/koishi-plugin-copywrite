@@ -95,7 +95,7 @@ describe('inspectAnthropicResponse', () => {
     expect(result.error).toEqual({ message: 'bad request' })
   })
 
-  it('截断判定：max_tokens + 空正文 + thinking', () => {
+  it('截断判定：max_tokens（无论是否已有正文）', () => {
     const base = {
       text: '',
       reasoning: '想过',
@@ -104,8 +104,8 @@ describe('inspectAnthropicResponse', () => {
     }
 
     expect(isAnthropicTruncated(base)).toBe(true)
-    expect(isAnthropicTruncated({ ...base, text: '正文' })).toBe(false)
-    expect(isAnthropicTruncated({ ...base, reasoning: '' })).toBe(false)
+    expect(isAnthropicTruncated({ ...base, text: '正文' })).toBe(true)
+    expect(isAnthropicTruncated({ ...base, reasoning: '' })).toBe(true)
     expect(isAnthropicTruncated({ ...base, stopReason: 'end_turn' })).toBe(false)
   })
 })

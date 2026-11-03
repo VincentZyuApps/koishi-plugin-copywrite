@@ -85,6 +85,12 @@ export function registerNewMeaning(
     try {
       const svg = extractSvg(result.text)
       if (!svg) {
+        if (
+          result.finishReason === 'length' ||
+          result.finishReason === 'max_tokens'
+        ) {
+          return '模型输出被截断，未生成完整 SVG，请提高 maxTokens 或关闭思考。'
+        }
         return '模型没有返回 SVG，请重试或换一个模型。'
       }
 

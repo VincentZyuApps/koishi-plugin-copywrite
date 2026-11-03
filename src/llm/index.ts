@@ -19,6 +19,7 @@ export type LlmVia = 'chatluna' | 'custom'
 export interface RouteResult {
   text: string
   reasoning?: string
+  finishReason?: string | null
   via: LlmVia
   /** chatluna 模式是模型名，custom 模式是 customProviders 的 key */
   channel: string
@@ -119,6 +120,7 @@ export class LlmRouter {
         return {
           text: result.text,
           reasoning: result.reasoning,
+          finishReason: result.finishReason,
           via,
           channel,
         }
@@ -168,6 +170,7 @@ export class LlmRouter {
       reasoningEffort: this.config.reasoningEffort,
       retryWithoutReasoning: this.config.retryWithoutReasoning,
       retryWithMoreTokens: this.config.retryWithMoreTokens,
+      truncateBehavior: this.config.truncateBehavior,
     }
 
     return resolved.apiFormat === 'anthropic'

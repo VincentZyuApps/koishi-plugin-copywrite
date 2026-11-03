@@ -53,6 +53,8 @@ export interface CustomProvider {
   apiFormat: ApiFormat
 }
 
+export type TruncateBehavior = 'partial' | 'error'
+
 /** ⚙️ 自定义 API 的全局调用参数 */
 export interface RequestDefaults {
   temperature: number
@@ -61,6 +63,7 @@ export interface RequestDefaults {
   reasoningEffort: ReasoningEffort
   retryWithoutReasoning: boolean
   retryWithMoreTokens: boolean
+  truncateBehavior: TruncateBehavior
 }
 
 /** 🔌 通道 + 全局参数，客户端实际使用的形态 */
@@ -109,6 +112,7 @@ export interface Config {
   reasoningEffort: ReasoningEffort
   retryWithoutReasoning: boolean
   retryWithMoreTokens: boolean
+  truncateBehavior: TruncateBehavior
 
   // 📂 模板数据
   presetDir: string
@@ -289,7 +293,7 @@ export const Config = Schema.intersect([
       .description('🌡️ 自定义 API 的默认采样温度（0–2），越高越发散。'),
     maxTokens: Schema.number()
       .min(1)
-      .default(2048)
+      .default(5120)
       .description('📏 自定义 API 单次回复的最大 token 数。'),
     timeout: Schema.number()
       .min(1000)
@@ -310,12 +314,21 @@ export const Config = Schema.intersect([
     retryWithoutReasoning: Schema.boolean()
       .default(true)
       .description(
-        '🔁 输出被思考截断（finish_reason=length 且正文为空）时，自动关闭思考重试一次。',
+        '🔁 输出被截断（finish_reason=length / stop_reason=max_tokens）时，自动关闭思考重试一次。',
       ),
     retryWithMoreTokens: Schema.boolean()
       .default(true)
       .description(
-        '📈 关闭思考重试仍失败，或未开启上一项时，把 maxTokens 翻倍重试一次（OpenAI 上限 10240）。',
+        '📈 关闭思考重试仍失败，或未开启上一项时，把 maxTokens 翻倍重试一次（上限 10240，仅当 maxTokens < 10240 时生效）。',
+      ),
+    truncateBehavior: Schema.union([
+      Schema.const('partial').description('返回最后一次的半截内容。'),
+      Schema.const('error').description('直接报错，不返回半截内容。'),
+    ])
+      .role('radio')
+      .default('partial')
+      .description(
+        '✂️ 文案与汉语新解共用：截断重试后仍然不完整时的处理方式。',
       ),
   }).description('⚙️ 调用参数'),
 

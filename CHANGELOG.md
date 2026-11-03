@@ -1,5 +1,25 @@
 # 更新日志
 
+## 0.1.5-beta.1+20261103
+
+### ✨ 新功能
+
+- `maxTokens` 默认值调整为 `5120`
+- 截断重试改为文案与汉语新解共用：只要 `finish_reason=length` / `stop_reason=max_tokens` 就重试，不再要求正文为空
+- 新增 `truncateBehavior` 单选框：
+  - `partial`（默认）：返回最后一次半截内容
+  - `error`：直接报错
+
+### 🐛 修复
+
+- 汉语新解被截断时不再笼统提示「没有返回 SVG」，而是提示输出被截断
+
+### 📚 文档
+
+- 预览图移动到 `docs/images/preview/copywrite/` 并同步 README / 预览页引用
+
+---
+
 ## 0.1.5-rc.4+20261102
 
 ### 🐛 修复

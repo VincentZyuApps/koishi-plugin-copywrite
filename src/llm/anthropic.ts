@@ -69,24 +69,28 @@ export class AnthropicClient implements LlmClient {
       )
 
     const first = await attempt()
-    if (first.text.trim()) return toChatResult(first)
     if (!isAnthropicTruncated(first)) {
+      if (first.text.trim()) return toChatResult(first)
       throw new LlmRequestError(describeAnthropicFailure(first))
     }
 
     const errors = [`首次请求：${describeAnthropicFailure(first)}`]
+    let last = first
 
     if (
       this.provider.retryWithoutReasoning &&
       this.provider.reasoningEffort !== 'off'
     ) {
       try {
-        logger.debug('输出被思考截断，尝试关闭 Anthropic thinking 重试')
+        logger.debug('输出被截断，尝试关闭 Anthropic thinking 重试')
         const retried = await attempt({
           disableThinking: true,
           maxTokens: configuredMaxTokens,
         })
-        if (retried.text.trim()) return toChatResult(retried)
+        if (retried.text.trim()) last = retried
+        if (!isAnthropicTruncated(retried) && retried.text.trim()) {
+          return toChatResult(retried)
+        }
         errors.push(`关闭思考重试：${describeAnthropicFailure(retried)}`)
       } catch (error) {
         errors.push(`关闭思考重试失败：${errorMessage(error)}`)
@@ -109,12 +113,19 @@ export class AnthropicClient implements LlmClient {
         try {
           logger.debug('尝试提高 Anthropic max_tokens 到 %d 重试', next)
           const retried = await attempt({ maxTokens: next })
-          if (retried.text.trim()) return toChatResult(retried)
+          if (retried.text.trim()) last = retried
+          if (!isAnthropicTruncated(retried) && retried.text.trim()) {
+            return toChatResult(retried)
+          }
           errors.push(`提高 maxTokens(${next}) 重试：${describeAnthropicFailure(retried)}`)
         } catch (error) {
           errors.push(`提高 maxTokens 重试失败：${errorMessage(error)}`)
         }
       }
+    }
+
+    if (this.provider.truncateBehavior === 'partial' && last.text.trim()) {
+      return toChatResult(last)
     }
 
     throw new LlmRequestError(errors.join('\n'))
@@ -229,13 +240,9 @@ export function inspectAnthropicResponse(
   return result
 }
 
-/** 是否被思考内容截断 */
+/** 是否因 max_tokens 被截断（无论是否已有部分正文） */
 export function isAnthropicTruncated(info: AnthropicInspection): boolean {
-  return (
-    info.stopReason === 'max_tokens' &&
-    !info.text.trim() &&
-    Boolean(info.reasoning.trim())
-  )
+  return info.stopReason === 'max_tokens'
 }
 
 function describeAnthropicFailure(info: AnthropicInspection): string {
@@ -258,6 +265,7 @@ function toChatResult(info: AnthropicInspection): ChatResult {
   return {
     text: info.text.trim(),
     reasoning: info.reasoning.trim() || undefined,
+    finishReason: info.stopReason,
   }
 }
 

@@ -51,24 +51,28 @@ export class OpenAiClient implements LlmClient {
       )
 
     const first = await attempt()
-    if (first.text.trim()) return toChatResult(first)
-    if (!isTruncatedByReasoning(first)) {
+    if (!isTruncatedOutput(first)) {
+      if (first.text.trim()) return toChatResult(first)
       throw new LlmRequestError(describeOpenAiFailure(first, maxTokens))
     }
 
     const errors = [`首次请求：${describeOpenAiFailure(first, maxTokens)}`]
+    let last = first
 
     if (
       this.provider.retryWithoutReasoning &&
       this.provider.reasoningEffort !== 'off'
     ) {
       try {
-        logger.debug('输出被思考截断，尝试关闭思考重试')
+        logger.debug('输出被截断，尝试关闭思考重试')
         const retried = await attempt({
           ...this.provider,
           reasoningEffort: 'off',
         })
-        if (retried.text.trim()) return toChatResult(retried)
+        if (retried.text.trim()) last = retried
+        if (!isTruncatedOutput(retried) && retried.text.trim()) {
+          return toChatResult(retried)
+        }
         errors.push(`关闭思考重试：${describeOpenAiFailure(retried, maxTokens)}`)
       } catch (error) {
         errors.push(`关闭思考重试失败：${errorMessage(error)}`)
@@ -81,7 +85,10 @@ export class OpenAiClient implements LlmClient {
         try {
           logger.debug('尝试提高 maxTokens 到 %d 重试', next)
           const retried = await attempt(this.provider, next)
-          if (retried.text.trim()) return toChatResult(retried)
+          if (retried.text.trim()) last = retried
+          if (!isTruncatedOutput(retried) && retried.text.trim()) {
+            return toChatResult(retried)
+          }
           errors.push(
             `提高 maxTokens(${next}) 重试：${describeOpenAiFailure(retried, next)}`,
           )
@@ -89,6 +96,10 @@ export class OpenAiClient implements LlmClient {
           errors.push(`提高 maxTokens 重试失败：${errorMessage(error)}`)
         }
       }
+    }
+
+    if (this.provider.truncateBehavior === 'partial' && last.text.trim()) {
+      return toChatResult(last)
     }
 
     throw new LlmRequestError(errors.join('\n'))
@@ -136,6 +147,7 @@ function toChatResult(info: OpenAiInspection): ChatResult {
   return {
     text: info.text.trim(),
     reasoning: info.reasoning.trim() || undefined,
+    finishReason: info.finishReason,
   }
 }
 
@@ -326,13 +338,9 @@ export function inspectOpenAiResponse(response: unknown): OpenAiInspection {
   return result
 }
 
-/** 是否被思考内容截断：没有正文，但思考把 token 用光了 */
-export function isTruncatedByReasoning(info: OpenAiInspection): boolean {
-  return (
-    info.finishReason === 'length' &&
-    !info.text.trim() &&
-    Boolean(info.reasoning.trim())
-  )
+/** 是否因 max_tokens 被截断（无论是否已有部分正文） */
+export function isTruncatedOutput(info: OpenAiInspection): boolean {
+  return info.finishReason === 'length'
 }
 
 /** 下一次重试的 maxTokens；达到上限时返回 null */
