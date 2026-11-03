@@ -4,7 +4,13 @@ import type { Config } from '../config'
 import { DEFAULT_NEW_MEANING_COMMAND_NAME } from '../constants'
 import { LlmRouter } from '../llm'
 import { buildNewMeaningMessages } from '../prompts/newmeaning'
-import { extractSvg, svgToPng } from '../render'
+import {
+  extractSvg,
+  listFontFamilies,
+  mapSvgFontFamilies,
+  svgToPng,
+} from '../render'
+import { ensureFonts, resolveFontPaths } from '../utils/font'
 import { sendReasoningMessage } from '../utils/reasoning'
 import { recallHint, sendWaitingHint, withQuote } from '../utils/reply'
 import { normalizeAliases, normalizeCommandName } from '../utils/command'
@@ -82,9 +88,24 @@ export function registerNewMeaning(
     await recallHint(ctx, session, hintId)
     await sendReasoningMessage(ctx, session, config, result.reasoning)
 
+    if (config.verboseLog) {
+      logger.info(
+        'verbose new-meaning: finishReason=%s text=%d reasoning=%d',
+        result.finishReason ?? 'unknown',
+        result.text.length,
+        result.reasoning?.length ?? 0,
+      )
+    }
+
     try {
       const svg = extractSvg(result.text)
       if (!svg) {
+        if (config.verboseLog) {
+          logger.info(
+            'verbose new-meaning output:\n%s',
+            result.text.slice(0, 4000),
+          )
+        }
         if (
           result.finishReason === 'length' ||
           result.finishReason === 'max_tokens'
@@ -94,10 +115,67 @@ export function registerNewMeaning(
         return '模型没有返回 SVG，请重试或换一个模型。'
       }
 
-      const png = svgToPng(svg, {
-        fontFamily: config.svgFontFamily,
+      const originalFonts = listFontFamilies(svg)
+      const useCustomFont = config.svgEnableCustomFont
+      let fontPaths = resolveFontPaths(ctx, config.svgFontPaths)
+
+      if (
+        useCustomFont &&
+        config.svgAutoDownloadFont &&
+        !fontPaths.fontFiles.length &&
+        !fontPaths.fontDirs.length
+      ) {
+        await ensureFonts(ctx)
+        fontPaths = resolveFontPaths(ctx, config.svgFontPaths)
+      }
+
+      const mappedSvg = useCustomFont
+        ? mapSvgFontFamilies(svg, {
+            contentFamily: config.svgContentFontFamily,
+            titleFamily: config.svgTitleFontFamily,
+          })
+        : svg
+
+      if (config.verboseLog) {
+        logger.info(
+          'verbose new-meaning svg: %d 字, fonts=[%s]',
+          svg.length,
+          originalFonts.join(' | ') || '(未声明)',
+        )
+        logger.info(
+          'verbose new-meaning fonts mapped: [%s]',
+          listFontFamilies(mappedSvg).join(' | ') || '(未声明)',
+        )
+        logger.info(
+          'verbose new-meaning fontPaths: files=[%s] dirs=[%s] missing=[%s]',
+          fontPaths.fontFiles.join(' | ') || '-',
+          fontPaths.fontDirs.join(' | ') || '-',
+          fontPaths.missing.join(' | ') || '-',
+        )
+        logger.info(
+          'verbose new-meaning render: fontFamily=%s scale=%s',
+          useCustomFont ? config.svgContentFontFamily : config.svgFontFamily,
+          config.svgScale,
+        )
+      }
+
+      const startedAt = Date.now()
+      const png = svgToPng(mappedSvg, {
+        fontFamily: useCustomFont
+          ? config.svgContentFontFamily
+          : config.svgFontFamily,
+        fontFiles: useCustomFont ? fontPaths.fontFiles : [],
+        fontDirs: useCustomFont ? fontPaths.fontDirs : [],
         scale: config.svgScale,
       })
+
+      if (config.verboseLog) {
+        logger.info(
+          'verbose new-meaning render done: %dms, %d bytes',
+          Date.now() - startedAt,
+          png.length,
+        )
+      }
 
       return h.image(png, 'image/png')
     } catch (error) {

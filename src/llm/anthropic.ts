@@ -77,6 +77,8 @@ export class AnthropicClient implements LlmClient {
     const errors = [`首次请求：${describeAnthropicFailure(first)}`]
     let last = first
 
+    ensureActive(this.ctx)
+
     if (
       this.provider.retryWithoutReasoning &&
       this.provider.reasoningEffort !== 'off'
@@ -96,6 +98,8 @@ export class AnthropicClient implements LlmClient {
         errors.push(`关闭思考重试失败：${errorMessage(error)}`)
       }
     }
+
+    ensureActive(this.ctx)
 
     if (this.provider.retryWithMoreTokens) {
       const budget =
@@ -266,6 +270,12 @@ function toChatResult(info: AnthropicInspection): ChatResult {
     text: info.text.trim(),
     reasoning: info.reasoning.trim() || undefined,
     finishReason: info.stopReason,
+  }
+}
+
+function ensureActive(ctx: Context) {
+  if ((ctx as unknown as { scope?: { isActive?: boolean } }).scope?.isActive === false) {
+    throw new LlmRequestError('插件已重载，请求已中止，请重新发送')
   }
 }
 

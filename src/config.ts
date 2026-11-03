@@ -39,6 +39,7 @@ import {
   type ReasoningEffort,
 } from './constants'
 import { DEFAULT_BUTTON_ROWS, stringifyCompact } from './qq'
+import { DEFAULT_LXGW_WENKAI_PATH } from './utils/font'
 
 // ====================
 // 📋 配置接口定义
@@ -123,6 +124,11 @@ export interface Config {
   enableNewMeaning: boolean
   newMeaningModel: string
   svgFontFamily: string
+  svgEnableCustomFont: boolean
+  svgAutoDownloadFont: boolean
+  svgFontPaths: string[]
+  svgContentFontFamily: string
+  svgTitleFontFamily: string
   svgScale: number
 
   // ⏳ 频率限制
@@ -364,6 +370,32 @@ export const Config = Schema.intersect([
     svgFontFamily: Schema.string()
       .default('Microsoft YaHei')
       .description('🔤 SVG 渲染时的默认字体族，缺字体时自动回退。'),
+    svgEnableCustomFont: Schema.boolean()
+      .default(true)
+      .description(
+        '🔤 是否启用自定义字体渲染。关闭后只使用系统字体与 svgFontFamily 兜底。',
+      ),
+    svgAutoDownloadFont: Schema.boolean()
+      .default(true)
+      .description(
+        '📥 启动时自动下载内置的 LXGW WenKai Mono 到 <code>data/fonts</code>；离线环境可关闭。',
+      ),
+    svgFontPaths: Schema.array(Schema.string())
+      .role('table')
+      .default([DEFAULT_LXGW_WENKAI_PATH])
+      .description(
+        '🔤 字体文件或目录列表，相对路径按 Koishi <code>baseDir</code> 解析。默认使用 <code>data/fonts/LXGWWenKaiMono-Regular.ttf</code>。',
+      ),
+    svgContentFontFamily: Schema.string()
+      .default('LXGWWenKaiMono')
+      .description(
+        '🔤 正文/解释字体名，会替换 SVG 里的「霞鹜文楷」「LXGW WenKai」等写法。',
+      ),
+    svgTitleFontFamily: Schema.string()
+      .default('LXGWWenKaiMono')
+      .description(
+        '🔤 标题/日文字体名，会替换 SVG 里的「文泉驿等宽正黑」「WenQuanYi Zen Hei」等写法。',
+      ),
     svgScale: Schema.number()
       .role('slider')
       .min(0.5)

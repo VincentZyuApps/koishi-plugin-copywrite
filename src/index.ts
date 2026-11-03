@@ -5,6 +5,7 @@ import { Config } from './config'
 import { PatternStore } from './data'
 import { LlmRouter } from './llm'
 import { registerModelSchema } from './llm/chatluna'
+import { ensureFonts } from './utils/font'
 
 export const name = 'copywrite'
 
@@ -24,6 +25,15 @@ export function apply(ctx: Context, config: Config) {
   const router = new LlmRouter(ctx, config)
 
   ctx.effect(() => () => store.dispose())
+
+  if (config.svgEnableCustomFont && config.svgAutoDownloadFont) {
+    void ensureFonts(ctx).catch((error) => {
+      logger.error(
+        '字体预检查失败：%s',
+        error instanceof Error ? error.message : String(error),
+      )
+    })
+  }
 
   registerCommands(ctx, config, store, router)
 

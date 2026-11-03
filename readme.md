@@ -131,6 +131,14 @@ __model__: sol          # 可选：该文件所有条目的默认模型
 - 模型名可以对应 `customProviders` 的 key，也可以用 `chatlunaModelMap` 映射到 ChatLuna。
 - 放进 `data/copywrite/presets/` 就生效，目录被监听，改完保存即可，不用重启。
 
+## 🔤 字体与许可
+
+「汉语新解」使用 [霞鹜文楷（LXGW WenKai Mono）](https://github.com/lxgw/LxgwWenKai) 渲染 SVG 卡片，遵循 SIL Open Font License 1.1。
+
+- 插件启动时会检查 `<koishi>/data/fonts/LXGWWenKaiMono-Regular.ttf`，缺失或 hash 不匹配时自动从 Gitee release 下载，失败后回退 GitHub release。
+- 可在 `svgFontPaths` 里追加字体文件或目录（相对路径按 Koishi `baseDir` 解析），并用 `svgContentFontFamily` / `svgTitleFontFamily` 指定实际字体名。
+- 关闭 `svgEnableCustomFont` 或 `svgAutoDownloadFont` 后，会回退到系统字体与 `svgFontFamily`。
+
 ## 📄 许可
 
 [Apache-2.0](./LICENSE)。

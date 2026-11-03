@@ -109,11 +109,16 @@ export class LlmRouter {
 
         if (this.config.verboseLog) {
           this.logger.info(
-            'verbose route: %s → %s (%dms, reasoning=%d 字)',
+            'verbose route: %s → %s (%dms, reasoning=%d 字, maxTokens=%d, reasoningEffort=%s, truncate=%s, retryWithout=%s, retryMore=%s)',
             via,
             channel || '(未指定)',
             Date.now() - startedAt,
             result.reasoning?.length ?? 0,
+            this.config.maxTokens,
+            this.config.reasoningEffort,
+            this.config.truncateBehavior,
+            this.config.retryWithoutReasoning,
+            this.config.retryWithMoreTokens,
           )
         }
 
