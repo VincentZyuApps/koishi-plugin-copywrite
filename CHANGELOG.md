@@ -1,5 +1,30 @@
 # 更新日志
 
+## 0.1.5-beta.3+20261103
+
+### 📚 文档
+
+- README 预览拆分为「你说得对」「汉语新解」两个子标题，并补充示例输入
+- `docs/preview.md` 按「文案 copywrite」「汉语新解 newmeaning」分级，补充汉语新解预览
+- 移除「介绍」段后面的重复更新日志入口
+
+---
+
+## 0.1.5-beta.2+20261103
+
+### ✨ 新功能
+
+- 新增 `data/fonts` 字体自动下载：Gitee 优先、GitHub 兜底，并做 hash 校验
+- SVG 渲染前把「霞鹜文楷」「文泉驿等宽正黑」映射到实际加载的字体
+- 新增 `svgEnableCustomFont`、`svgAutoDownloadFont`、`svgFontPaths`、`svgContentFontFamily`、`svgTitleFontFamily` 配置
+
+### 🐛 修复
+
+- 重试前检查 ctx 是否已 dispose，避免 HMR 时出现 `context disposed`
+- verbose 日志补充实际 maxTokens、重试配置、字体路径与映射结果
+
+---
+
 ## 0.1.5-beta.1+20261103
 
 ### ✨ 新功能

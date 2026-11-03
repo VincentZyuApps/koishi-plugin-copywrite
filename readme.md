@@ -27,13 +27,21 @@
 
 移植自 [nonebot-plugin-copywrite](https://github.com/Yan-Zero/nonebot-plugin-copywrite)，感谢原作者 [Yan-Zero](https://github.com/Yan-Zero) 的文案模板与 prompt 设计。
 
-> **[📖 查看完整更新日志 →](./CHANGELOG.md)**
-
 ## 🖼️ 预览
 
 > 你说得对，但是 koishi-plugin-copywrite 定型文生成器是由 Koishi 社区开发者打造的一款全新文案仿写插件。插件运行在一个被称作「示例文案」的语言世界中，在这里，被用户选中的人将被授予「主题」，导引措辞与语气之力。用户将扮演一位名为「生成器」的神秘角色，在自由的仿写中邂逅风格各异、腔调独特的示例文案们，和它们一起提炼句式、复刻语气，生成贴合主题的新文案——同时，逐步发掘「定型文生成」的真相。
 
-![你说的对](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/copywrite/preview-%E4%BD%A0%E8%AF%B4%E5%BE%97%E5%AF%B9.png)
+### 📝 你说得对
+
+> 示例输入：`文案 你说得对 claude账号被Anthropic封禁`
+
+![你说得对](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/copywrite/preview-%E4%BD%A0%E8%AF%B4%E5%BE%97%E5%AF%B9.png)
+
+### 🧠 汉语新解
+
+> 示例输入：`汉语新解 claude账号被Anthropic封禁`
+
+![汉语新解](https://cdn.jsdelivr.net/gh/VincentZyuApps/koishi-plugin-copywrite@main/docs/images/preview/newmeaning/preview-%E6%B1%89%E8%AF%AD%E6%96%B0%E8%A7%A3.png)
 
 👉 [查看更多预览](https://github.com/VincentZyuApps/koishi-plugin-copywrite/blob/main/docs/preview.md)
 
