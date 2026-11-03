@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// 只测纯格式化函数，避免把 koishi 运行时拉进单测
+vi.mock('koishi', () => ({
+  h: {
+    quote: (id: string) => ({ type: 'quote', attrs: { id }, children: [] }),
+  },
+}))
 
 import {
   formatReasoningMessage,

@@ -4,6 +4,7 @@ import { registerCommands } from './commands'
 import { Config } from './config'
 import { PatternStore } from './data'
 import { LlmRouter } from './llm'
+import { registerModelSchema } from './llm/chatluna'
 
 export const name = 'copywrite'
 
@@ -27,8 +28,10 @@ export function apply(ctx: Context, config: Config) {
   registerCommands(ctx, config, store, router)
 
   // ChatLuna 是可选的：在它可用时再注册 Schema.dynamic('model') 的下拉数据源。
+  // 注意：不要在 dev（esbuild-register）里动态 import 本地无扩展名路径，
+  // 原生 ESM 解析会找不到 `.ts` 文件；静态 import 由 esbuild 统一处理。
   ctx.inject(['chatluna'], (ctx) => {
-    void import('./llm/chatluna').then((mod) => mod.registerModelSchema(ctx))
+    void registerModelSchema(ctx)
   })
 
   ctx.on('ready', async () => {

@@ -1,5 +1,18 @@
 # 更新日志
 
+## 0.1.5-rc.4+20261102
+
+### 🐛 修复
+
+- 修复本地 dev（`esbuild-register`）下本地模块动态 `import()` 触发的 `ERR_MODULE_NOT_FOUND`
+- ChatLuna 模型 Schema 注册与 `qq:rawmarkdown` 兜底改为静态导入
+
+### 📚 文档
+
+- README 预览图上方新增「你说得对，但是……」示范文案
+
+---
+
 ## 0.1.5-rc.3+20261102
 
 ### 📚 文档

@@ -1,6 +1,8 @@
 import type { Context, Session } from 'koishi'
 
 import type { Config } from '../config'
+import { sendQQMarkdown } from '../qq'
+import { withQuote } from './reply'
 
 /**
  * 把过长的思考文本截断：保留开头 80% 与结尾 20%，中间用「省略 N 字」代替。
@@ -62,12 +64,6 @@ export async function sendReasoningMessage(
   if (!text) return
 
   const content = formatReasoningMessage(text, config.reasoningMaxChars)
-
-  // 延迟加载，保证格式化函数可以在不引入 koishi 运行时的单测里使用。
-  const [{ sendQQMarkdown }, { withQuote }] = await Promise.all([
-    import('../qq'),
-    import('./reply'),
-  ])
 
   if (config.enableReasoningViaQQMarkdown && session.platform === 'qq') {
     const sent = await sendQQMarkdown(session, toBlockquote(content))

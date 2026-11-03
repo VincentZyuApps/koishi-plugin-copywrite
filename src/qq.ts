@@ -159,8 +159,13 @@ export async function sendQQMarkdown(
   }
 
   try {
-    const { h } = await import('koishi')
-    await session.send(h('qq:rawmarkdown', { content: markdown }))
+    // 避免 dev（esbuild-register）里动态 import 本地模块的解析问题；
+    // 元素对象与 h('qq:rawmarkdown', { content }) 等价。
+    await session.send({
+      type: 'qq:rawmarkdown',
+      attrs: { content: markdown },
+      children: [],
+    } as any)
     return true
   } catch {
     return false
