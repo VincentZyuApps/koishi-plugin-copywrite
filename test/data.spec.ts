@@ -77,11 +77,11 @@ describe('parsePresetYaml', () => {
 })
 
 describe('内置模板', () => {
-  it('7 个文件、34 条模板、5 个分类', async () => {
+  it('8 个文件、35 条模板、5 个分类', async () => {
     const result = await loadPresetDir(RESOURCES)
 
-    expect(result.files).toHaveLength(7)
-    expect(result.patterns.size).toBe(34)
+    expect(result.files).toHaveLength(8)
+    expect(result.patterns.size).toBe(35)
     expect([...result.categories.keys()].sort()).toEqual([
       'Fran',
       'Life.Checkpoint',
@@ -89,6 +89,16 @@ describe('内置模板', () => {
       'VincentZyu',
       'Yan',
     ])
+  })
+
+  it('nice 使用 VincentZyu 短模板并保留 10 条示例', async () => {
+    const result = await loadPresetDir(RESOURCES)
+    const entry = result.patterns.get('nice')
+
+    expect(entry).toBeDefined()
+    expect(entry!.category).toBe('VincentZyu')
+    expect(entry!.examples).toHaveLength(10)
+    expect(entry!.examples[9]).toContain('Knight')
   })
 
   it('内置模板本身没有解析错误', async () => {
