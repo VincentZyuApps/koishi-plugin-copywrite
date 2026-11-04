@@ -111,7 +111,7 @@ describe('内置模板', () => {
     const entry = result.patterns.get('真拿你没办法')
 
     expect(entry).toBeDefined()
-    expect(entry!.examples).toHaveLength(5)
+    expect(entry!.examples).toHaveLength(4)
     expect(entry!.examples[0]).toContain('DANK1NG')
     expect(entry!.model).toBe('sol')
     expect(
